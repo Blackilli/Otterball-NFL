@@ -176,10 +176,11 @@ class MyClient(discord.Client):
                 try:
                     channel = await self.fetch_channel(poll.channel_id)
                     message = await channel.fetch_message(poll.message_id)
-                    await message.poll.end()
+                    if message.poll.victor_answer is not None:
+                        await message.poll.end()
                     poll.closed = True
                 except Exception as e:
-                    print(e)
+                    logger.error(e)
                     continue
             session.commit()
 
@@ -293,12 +294,12 @@ class MyClient(discord.Client):
             for db_poll in session.scalars(stmt).all():
                 db_polls.append(db_poll)
 
-        print(f"{found_user=}")
-        print(f"{db_polls=}")
+        logger.debug(f"{found_user=}")
+        logger.debug(f"{db_polls=}")
         for db_poll in db_polls:
             with Session(self.db) as session:
                 db_poll: models.Poll | None = session.get(models.Poll, db_poll.id)
-                print(db_poll)
+                logger.debug(db_poll)
                 if not db_poll:
                     raise Exception("Poll not found")
                 channel = await self.fetch_channel(db_poll.channel_id)
@@ -307,7 +308,7 @@ class MyClient(discord.Client):
                 found_bets: dict[int, models.Bet] = {
                     bet.user_id: bet for bet in db_poll.game.bets
                 }
-                print(f"{found_bets=}")
+                logger.debug(f"{found_bets=}")
 
                 for answer in poll.answers:
                     voters = [voter async for voter in answer.voters()]
@@ -414,8 +415,8 @@ class MyClient(discord.Client):
         print("LOL")
 
     async def on_message(self, message: discord.Message):
-        logger.info(f"Message from {message.author}: {message.content}")
-        logger.info(f"Channel: {message.channel.id}")
+        logger.debug(f"Message from {message.author}: {message.content}")
+        logger.debug(f"Channel: {message.channel.id}")
 
 
 def main():
