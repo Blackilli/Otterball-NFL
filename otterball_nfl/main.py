@@ -27,55 +27,6 @@ from sqlalchemy import create_engine
 logger = logging.getLogger("mybot")
 
 
-class BetPollAnswer(enum.IntEnum):
-    HOME = 0
-    AWAY = 1
-    TIE = 2
-
-    def to_db_enum(self):
-        if self == BetPollAnswer.HOME:
-            return models.Outcome.HOME
-        elif self == BetPollAnswer.AWAY:
-            return models.Outcome.AWAY
-        elif self == BetPollAnswer.TIE:
-            return models.Outcome.TIE
-
-
-class BetPoll(discord.Poll):
-    def __init__(
-        self,
-        *args,
-        home_team: str,
-        home_team_emoji: discord.Emoji,
-        away_team: str,
-        away_team_emoji: discord.Emoji,
-        tieable: bool = False,
-        **kwargs,
-    ):
-        super().__init__(
-            question=PollMedia(f"{home_team} - {away_team}"), *args, **kwargs
-        )
-        for answer in sorted(BetPollAnswer):
-            if answer == BetPollAnswer.HOME:
-                self.add_answer(text=home_team, emoji=home_team_emoji)
-            elif answer == BetPollAnswer.AWAY:
-                self.add_answer(text=away_team, emoji=away_team_emoji)
-            elif answer == BetPollAnswer.TIE and tieable:
-                self.add_answer(text="Tie", emoji="🤝")
-
-    @property
-    def answer_home(self):
-        return self.answers[BetPollAnswer.HOME]
-
-    @property
-    def answer_away(self):
-        return self.answers[BetPollAnswer.AWAY]
-
-    @property
-    def answer_tie(self):
-        return self.answers[BetPollAnswer.TIE]
-
-
 class MyClient(discord.Client):
     db: sqlalchemy.engine.Engine
 
@@ -111,12 +62,12 @@ class MyClient(discord.Client):
                     db_game.kickoff - datetime.datetime.now(datetime.timezone.utc)
                 ),
             )
-            for answer in sorted(BetPollAnswer):
-                if answer == BetPollAnswer.HOME:
+            for answer in sorted(models.Outcome):
+                if answer == models.Outcome.HOME:
                     poll.add_answer(text=home_team.name, emoji=home_emoji)
-                elif answer == BetPollAnswer.AWAY:
+                elif answer == models.Outcome.AWAY:
                     poll.add_answer(text=away_team.name, emoji=away_emoji)
-                elif answer == BetPollAnswer.TIE and db_game.gametype_id == "REG":
+                elif answer == models.Outcome.TIE and db_game.gametype_id == "REG":
                     poll.add_answer(text="Tie", emoji="🤝")
             try:
                 content = (
