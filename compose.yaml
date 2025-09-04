@@ -30,26 +30,21 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   app:
-    # Build the image from the Dockerfile in the current directory
     build: .
 
     env_file:
       - .env
 
     develop:
-      # Create a `watch` configuration to update the app
-      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
       watch:
-        # Sync the working directory with the `/app` directory in the container
         - action: sync
           path: .
           target: /app
-          # Exclude the project virtual environment — it could be for a
-          # different platform in the container
           ignore:
             - .venv/
+            - .git/
+            - .idea/
 
-        # Rebuild the image if dependencies change by checking uv.lock
         - action: rebuild
           path: ./uv.lock
     depends_on:
@@ -61,7 +56,6 @@ services:
           restart: true
 
   app-worker:
-    # Build the image from the Dockerfile in the current directory
     build: .
     command: uv run -- celery -A otterball_nfl.tasks worker --loglevel=INFO
 
@@ -69,19 +63,15 @@ services:
       - .env
 
     develop:
-      # Create a `watch` configuration to update the app
-      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
       watch:
-        # Sync the working directory with the `/app` directory in the container
         - action: sync
           path: .
           target: /app
-          # Exclude the project virtual environment — it could be for a
-          # different platform in the container
           ignore:
             - .venv/
+            - .git/
+            - .idea/
 
-        # Rebuild the image if dependencies change by checking uv.lock
         - action: rebuild
           path: ./uv.lock
     depends_on:
@@ -93,7 +83,6 @@ services:
         restart: true
 
   app-scheduler:
-    # Build the image from the Dockerfile in the current directory
     build: .
     command: uv run -- celery -A otterball_nfl.tasks beat --loglevel=INFO
 
@@ -101,19 +90,15 @@ services:
       - .env
 
     develop:
-      # Create a `watch` configuration to update the app
-      # https://docs.docker.com/compose/file-watch/#compose-watch-versus-bind-mounts
       watch:
-        # Sync the working directory with the `/app` directory in the container
         - action: sync
           path: .
           target: /app
-          # Exclude the project virtual environment — it could be for a
-          # different platform in the container
           ignore:
             - .venv/
+            - .git/
+            - .idea/
 
-        # Rebuild the image if dependencies change by checking uv.lock
         - action: rebuild
           path: ./uv.lock
     depends_on:
