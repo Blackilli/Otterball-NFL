@@ -203,7 +203,7 @@ class Poll(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     channel_id: Mapped[int] = mapped_column(ForeignKey("channel.id"))
-    message_id: Mapped[int] = mapped_column(BigInteger)
+    message_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
     game_id: Mapped[str] = mapped_column(ForeignKey("game.id"))
     closed: Mapped[bool] = mapped_column(Boolean, default=False)
     result_posted: Mapped[bool] = mapped_column(Boolean, default=False)

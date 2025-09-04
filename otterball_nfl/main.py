@@ -84,6 +84,7 @@ class MyClient(discord.Client):
 
     async def setup_hook(self) -> None:
         self.check_polls.start()
+        self.create_new_polls.start()
         pass
 
     async def close_poll(self, db_poll: models.Poll):
@@ -91,6 +92,76 @@ class MyClient(discord.Client):
         message = await channel.fetch_message(db_poll.message_id)
         await message.poll.end()
         db_poll.closed = True
+
+    async def post_poll(self, poll_id: int):
+        with Session(self.db) as session:
+            db_poll: models.Poll | None = session.get(models.Poll, poll_id)
+            db_channel: models.Channel | None = session.get(
+                models.Channel, db_poll.channel_id
+            )
+            db_game: models.Game | None = session.get(models.Game, db_poll.game_id)
+            home_team: models.Team | None = session.get(
+                models.Team, db_game.home_team_id
+            )
+            away_team: models.Team | None = session.get(
+                models.Team, db_game.away_team_id
+            )
+            home_emoji = await self.fetch_application_emoji(home_team.emoji_id)
+            away_emoji = await self.fetch_application_emoji(away_team.emoji_id)
+
+            channel = await self.fetch_channel(db_channel.id)
+            poll = discord.Poll(
+                PollMedia(f"{home_team.name} - {away_team.name}"),
+                duration=(
+                    db_game.kickoff - datetime.datetime.now(datetime.timezone.utc)
+                ),
+            )
+            for answer in sorted(BetPollAnswer):
+                if answer == BetPollAnswer.HOME:
+                    poll.add_answer(text=home_team.name, emoji=home_emoji)
+                elif answer == BetPollAnswer.AWAY:
+                    poll.add_answer(text=away_team.name, emoji=away_emoji)
+                elif answer == BetPollAnswer.TIE and db_game.gametype_id == "REG":
+                    poll.add_answer(text="Tie", emoji="🤝")
+            try:
+                content = (
+                    f"# {home_emoji} {home_team.name} - {away_team.name} {away_emoji}"
+                )
+                content += f"\n### 🏈   {db_game.gametype.name}"
+                content += f"\n### 📅   <t:{int(db_game.kickoff.timestamp())}:F> "
+                content += f"\n### ⏳   <t:{int(db_game.kickoff.timestamp())}:R>"
+                content += (
+                    f"\n-# Polls may close early, so don't vote on the last second "
+                )
+
+                if db_channel.role_id:
+                    content += (
+                        await channel.guild.fetch_role(db_channel.role_id)
+                    ).mention
+
+                msg = await channel.send(
+                    content=content,
+                    poll=poll,
+                )
+                db_poll.message_id = msg.id
+                session.add(db_poll)
+                session.commit()
+            except HTTPException as e:
+                print(e)
+
+    @tasks.loop(seconds=10)
+    async def create_new_polls(self):
+        new_polls: list[models.Poll] = []
+        with Session(self.db) as session:
+            stmt = select(models.Poll).where(models.Poll.message_id == None)
+            for db_poll in session.scalars(stmt).all():
+                new_polls.append(db_poll)
+        for db_poll in new_polls:
+            await self.post_poll(db_poll.id)
+
+    @create_new_polls.before_loop
+    async def before_create_new_polls(self):
+        await self.wait_until_ready()
 
     @tasks.loop(seconds=10)
     async def check_polls(self):
@@ -100,7 +171,9 @@ class MyClient(discord.Client):
                 select(models.Poll)
                 .join(models.Game)
                 .where(models.Poll.closed == False)
-                .where(models.Game.kickoff <= datetime.datetime.now())
+                .where(
+                    models.Game.kickoff <= datetime.datetime.now(datetime.timezone.utc)
+                )
             )
             for poll in session.scalars(stmt).all():
                 polls.append(poll)
@@ -253,7 +326,7 @@ class MyClient(discord.Client):
         await self.populate_game_types()
         await self.populate_all_teams()
 
-    async def post_poll(self, game_id: str):
+    async def old_post_poll(self, game_id: str):
         with Session(self.db) as session:
             stmt = select(Game).where(Game.id == game_id)
             game: Game = session.scalars(stmt).first()
@@ -270,7 +343,9 @@ class MyClient(discord.Client):
                 channel = await self.fetch_channel(db_channel.id)
                 poll = discord.Poll(
                     PollMedia(f"{game.home_team.name} - {game.away_team.name}"),
-                    duration=(game.kickoff - datetime.datetime.now()),
+                    duration=(
+                        game.kickoff - datetime.datetime.now(datetime.timezone.utc)
+                    ),
                 )
                 for answer in sorted(BetPollAnswer):
                     if answer == BetPollAnswer.HOME:
@@ -281,11 +356,11 @@ class MyClient(discord.Client):
                         poll.add_answer(text="Tie", emoji="🤝")
                 try:
                     content = f"# {home_emoji} {game.home_team.name} - {game.away_team.name} {away_emoji}"
-                    content += f"### 🏈   {game.gametype.name}"
-                    content += f"### 📅   <t:{int(game.kickoff.timestamp())}:F> "
-                    content += f"### ⏳   <t:{int(game.kickoff.timestamp())}:R>"
+                    content += f"\n### 🏈   {game.gametype.name}"
+                    content += f"\n### 📅   <t:{int(game.kickoff.timestamp())}:F> "
+                    content += f"\n### ⏳   <t:{int(game.kickoff.timestamp())}:R>"
                     content += (
-                        f"-# Polls may close early, so don't vote on the last second "
+                        f"\n-# Polls may close early, so don't vote on the last second "
                     )
 
                     if db_channel.role_id:
@@ -382,7 +457,9 @@ class MyClient(discord.Client):
         async for guild in self.fetch_guilds():
             roles = await guild.fetch_roles()
             for role in roles:
-                print(f"{guild.name}: {role} ({role.id})")
+
+                print(f"{guild.name}: {role} ({role.id}) {role.members}#")
+
             channels = await guild.fetch_channels()
             for channel in channels:
                 print(f"{guild.name}: {channel} ({channel.id})")

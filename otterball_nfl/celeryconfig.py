@@ -19,4 +19,8 @@ beat_schedule = {
         "schedule": crontab(minute="*/5"),
         "args": (2025,),
     },
+    "create-new-polls-every-wednesday": {
+        "task": "otterball_nfl.tasks.create_polls",
+        "schedule": crontab(day_of_week="wednesday", minute="*/1"),
+    },
 }

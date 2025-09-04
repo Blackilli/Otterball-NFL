@@ -1,3 +1,4 @@
+import datetime
 from zoneinfo import ZoneInfo
 
 import nfl_data_py as nfl
@@ -72,6 +73,39 @@ def update_games(self: Task, season: int):
                 )
                 for poll in session.scalars(stmt).all():
                     pass
-                # print(game.game_id)
-                # print("HAT ANGEFANGEN")
+        session.commit()
+
+
+@app.task(bind=True, ignore_result=True)
+def create_polls(self: Task):
+    logger.info("Creating polls")
+    with Session(engine) as session:
+        stmt = select(models.Channel)
+        channels: set[models.Channel] = set(session.scalars(stmt).all())
+        stmt = select(models.Game).where(
+            models.Game.kickoff.between(
+                datetime.datetime.now(ZoneInfo("UTC")),
+                datetime.datetime.now(ZoneInfo("UTC")) + datetime.timedelta(days=7),
+            )
+        )
+        for game in session.scalars(stmt).all():
+            print(game.id)
+            for channel in channels:
+                print(channel.id)
+                stmt = (
+                    select(models.Poll)
+                    .where(models.Poll.game_id == game.id)
+                    .where(models.Poll.channel_id == channel.id)
+                )
+                if session.scalars(stmt).first():
+                    logger.info(f"Poll already exists for {game.id} in {channel.id}")
+                    continue
+                session.add(
+                    models.Poll(
+                        channel=channel,
+                        game=game,
+                        closed=False,
+                        result_posted=False,
+                    )
+                )
         session.commit()
