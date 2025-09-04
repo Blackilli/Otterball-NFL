@@ -44,7 +44,6 @@ def update_games(self: Task, season: int):
                         int(game.result) if not isnan(game.result) else None
                     )
                     db_game.outcome = models.Outcome.from_result(db_game.result)
-
                 else:
                     db_game = Game(
                         id=game.game_id,

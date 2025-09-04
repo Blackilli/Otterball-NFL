@@ -2,6 +2,7 @@ import datetime
 import enum
 
 import logging
+from zoneinfo import ZoneInfo
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -83,15 +84,9 @@ class MyClient(discord.Client):
         super().__init__(*args, **kwargs)
 
     async def setup_hook(self) -> None:
-        self.check_polls.start()
+        self.close_polls.start()
         self.create_new_polls.start()
-        pass
-
-    async def close_poll(self, db_poll: models.Poll):
-        channel = await self.fetch_channel(db_poll.channel_id)
-        message = await channel.fetch_message(db_poll.message_id)
-        await message.poll.end()
-        db_poll.closed = True
+        self.post_results.start()
 
     async def post_poll(self, poll_id: int):
         with Session(self.db) as session:
@@ -147,7 +142,7 @@ class MyClient(discord.Client):
                 session.add(db_poll)
                 session.commit()
             except HTTPException as e:
-                print(e)
+                logger.error(e)
 
     @tasks.loop(seconds=10)
     async def create_new_polls(self):
@@ -169,33 +164,31 @@ class MyClient(discord.Client):
         await self.wait_until_ready()
 
     @tasks.loop(seconds=10)
-    async def check_polls(self):
-        polls: list[models.Poll] = []
+    async def close_polls(self):
         with Session(self.db) as session:
             stmt = (
                 select(models.Poll)
                 .join(models.Game)
                 .where(models.Poll.closed == False)
-                .where(
-                    models.Game.kickoff <= datetime.datetime.now(datetime.timezone.utc)
-                )
+                .where(models.Game.kickoff <= datetime.datetime.now(ZoneInfo("UTC")))
             )
             for poll in session.scalars(stmt).all():
-                polls.append(poll)
-        with Session(self.db) as session:
-            for poll in polls:
-                poll: models.Poll
-                if poll.closed:
-                    continue
                 try:
-                    await self.close_poll(poll)
+                    channel = await self.fetch_channel(poll.channel_id)
+                    message = await channel.fetch_message(poll.message_id)
+                    await message.poll.end()
+                    poll.closed = True
                 except Exception as e:
                     print(e)
                     continue
             session.commit()
 
+    @close_polls.before_loop
+    async def before_check_polls(self):
+        await self.wait_until_ready()
+
     @tasks.loop(seconds=10)
-    async def check_results_posted(self):
+    async def post_results(self):
         polls: list[models.Poll] = []
 
         with Session(self.db) as session:
@@ -209,33 +202,49 @@ class MyClient(discord.Client):
             )
             for poll in session.scalars(stmt).all():
                 polls.append(poll)
+
         for db_poll in polls:
-            with Session(self.db) as session:
-                poll: models.Poll | None = session.get(models.Poll, db_poll.id)
-                if not poll:
-                    raise Exception("Poll not found")
-                channel = await self.get_or_fetch_channel(poll.channel_id)
-                poll_msg = await channel.fetch_message(poll.message_id)
-                result_txt = "The game has ended!\n"
-                if poll.game.result == 0:
-                    result_txt += "It's a tie, no one won!!! \n-# lol not gonna happen anyway. I want to thank my mom <3"
-                else:
-                    winner_emoji = self.fetch_application_emoji(
-                        poll.game.winner.emoji_id
+            try:
+                with Session(self.db) as session:
+                    poll: models.Poll | None = session.get(models.Poll, db_poll.id)
+                    if not poll:
+                        raise Exception("Poll not found")
+                    channel = await self.get_or_fetch_channel(poll.channel_id)
+                    poll_msg = await channel.fetch_message(poll.message_id)
+                    result_txt = "The game has ended!\n"
+                    if poll.game.outcome == models.Outcome.TIE:
+                        result_txt += "It's a tie, no one won!!! \n-# lol not gonna happen anyway. I want to thank my mom <3"
+                    else:
+                        winner_emoji = self.fetch_application_emoji(
+                            poll.game.winner.emoji_id
+                        )
+                        result_txt += f"The winner is {winner_emoji} {poll.game.winner.name} {winner_emoji}!\n"
+                    result_txt += "-# GG "
+
+                    stmt = (
+                        select(models.Bet)
+                        .where(models.Bet.channel_id == poll.channel_id)
+                        .where(models.Bet.game_id == poll.game_id)
+                        .where(models.Bet.choice == poll.game.outcome)
                     )
-                    result_txt += f"The winner is {winner_emoji} {poll.game.winner.name} {winner_emoji}!\n"
-                result_txt += "-# GG "
-                for bet in poll.game.bets:
-                    if bet.channel_id != poll.channel_id:
-                        continue
-                    if bet.choice != bet.game.outcome:
-                        continue
-                    user = await self.get_or_fetch_user(bet.user_id)
-                    result_txt += f"{user.name}, "
-                result_txt = result_txt[:-2]
-                await poll_msg.reply(result_txt)
-                poll.result_posted = True
-                session.commit()
+                    winner_bets: list[models.Bet] = list(session.scalars(stmt).all())
+                    for bet in winner_bets:
+                        user = await self.get_or_fetch_user(bet.user_id)
+                        result_txt += f"{user.name}, "
+                    if len(winner_bets) == 0:
+                        result_txt += "nobody......... What is wrong with you guys?!"
+                    else:
+                        result_txt = result_txt[:-2]
+                    await poll_msg.reply(result_txt)
+                    poll.result_posted = True
+                    session.commit()
+            except Exception as e:
+                logger.error(e)
+                continue
+
+    @post_results.before_loop
+    async def before_post_results(self):
+        await self.wait_until_ready()
 
     async def get_or_fetch_user(self, user_id: int):
         user = self.get_user(user_id)
@@ -248,10 +257,6 @@ class MyClient(discord.Client):
         if channel is None:
             channel = await self.fetch_channel(channel_id)
         return channel
-
-    @check_polls.before_loop
-    async def before_check_polls(self):
-        await self.wait_until_ready()
 
     async def post_leaderboards(self):
         channels: dict[int, dict[int, int]] = {}
@@ -333,70 +338,7 @@ class MyClient(discord.Client):
         await self.populate_game_types()
         await self.populate_all_teams()
 
-    async def old_post_poll(self, game_id: str):
-        with Session(self.db) as session:
-            stmt = select(Game).where(Game.id == game_id)
-            game: Game = session.scalars(stmt).first()
-            if not game:
-                raise Exception("Game not found")
-            stmt = select(Channel)
-            channels: set[Channel] = set(session.scalars(stmt).all())
-            for poll in game.polls:
-                channels.remove(poll.channel)
-            home_emoji = await self.fetch_application_emoji(game.home_team.emoji_id)
-            away_emoji = await self.fetch_application_emoji(game.away_team.emoji_id)
-
-            for db_channel in channels:
-                channel = await self.fetch_channel(db_channel.id)
-                poll = discord.Poll(
-                    PollMedia(f"{game.home_team.name} - {game.away_team.name}"),
-                    duration=(
-                        game.kickoff - datetime.datetime.now(datetime.timezone.utc)
-                    ),
-                )
-                for answer in sorted(BetPollAnswer):
-                    if answer == BetPollAnswer.HOME:
-                        poll.add_answer(text=game.home_team.name, emoji=home_emoji)
-                    elif answer == BetPollAnswer.AWAY:
-                        poll.add_answer(text=game.away_team.name, emoji=away_emoji)
-                    elif answer == BetPollAnswer.TIE and game.gametype_id == "REG":
-                        poll.add_answer(text="Tie", emoji="🤝")
-                try:
-                    content = f"# {home_emoji} {game.home_team.name} - {game.away_team.name} {away_emoji}"
-                    content += f"\n### 🏈   {game.gametype.name}"
-                    content += f"\n### 📅   <t:{int(game.kickoff.timestamp())}:F> "
-                    content += f"\n### ⏳   <t:{int(game.kickoff.timestamp())}:R>"
-                    content += (
-                        f"\n-# Polls may close early, so don't vote on the last second "
-                    )
-
-                    if db_channel.role_id:
-                        content += (
-                            await channel.guild.fetch_role(db_channel.role_id)
-                        ).mention
-
-                    msg = await channel.send(
-                        content=content,
-                        poll=poll,
-                    )
-
-                    session.add(
-                        models.Poll(
-                            message_id=msg.id,
-                            channel_id=db_channel.id,
-                            game_id=game.id,
-                        )
-                    )
-                    session.commit()
-                except HTTPException as e:
-                    print(e)
-                    continue
-
-        return
-
     async def populate_team(self, team: pd.Series, emoji_id: int = 0):
-        # print(team)
-        # print(team.team_abbr, team.team_logo_wikipedia)
         if emoji_id == 0:
             response = httpx.get(team.team_logo_wikipedia, follow_redirects=True)
             image = response.content
@@ -456,7 +398,7 @@ class MyClient(discord.Client):
                     session.add(game_type)
                     session.commit()
                 except Exception as e:
-                    print(e)
+                    logger.error(e)
 
     async def on_ready(self):
         print(f"Logged on as {self.user}!")
@@ -464,13 +406,10 @@ class MyClient(discord.Client):
         async for guild in self.fetch_guilds():
             roles = await guild.fetch_roles()
             for role in roles:
-
                 print(f"{guild.name}: {role} ({role.id}) {role.members}#")
-
             channels = await guild.fetch_channels()
             for channel in channels:
                 print(f"{guild.name}: {channel} ({channel.id})")
-        # await self.post_poll("2025_01_DAL_PHI")
         # await self.update_all_bets()
         print("LOL")
 
@@ -485,7 +424,7 @@ def main():
     intents.members = True
     intents.messages = True
 
-    engine = create_engine(settings.DB_CONNECTION_STRING, echo=True)
+    engine = create_engine(settings.DB_CONNECTION_STRING, echo=False)
     Base.metadata.create_all(engine)
 
     client = MyClient(intents=intents, db_engine=engine)
