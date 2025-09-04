@@ -74,6 +74,11 @@ class MyClient(discord.Client):
                     f"# {home_emoji} {home_team.name} - {away_team.name} {away_emoji}"
                 )
                 content += f"\n### 🏈   {db_game.gametype.name}"
+                db_scaling = session.get(
+                    models.GameTypeScaling, (db_channel.id, db_game.gametype_id)
+                )
+                if db_scaling and db_scaling.factor:
+                    content += f" (Grants you {db_scaling.factor} point{'' if db_scaling.factor == 1 else 's'})"
                 content += f"\n### 📅   <t:{int(db_game.kickoff.timestamp())}:F> "
                 content += f"\n### ⏳   <t:{int(db_game.kickoff.timestamp())}:R>"
                 content += (
