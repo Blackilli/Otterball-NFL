@@ -10,6 +10,8 @@ services:
       interval: 10s
       timeout: 30s
       retries: 3
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
 
   db:
     image: postgres:17-alpine
@@ -30,10 +32,6 @@ services:
   app:
     # Build the image from the Dockerfile in the current directory
     build: .
-
-    # Host the FastAPI application on port 8000
-    ports:
-      - "8000:8000"
 
     env_file:
       - .env
@@ -128,3 +126,4 @@ services:
 
 volumes:
   pgdata:
+  rabbitmq:
