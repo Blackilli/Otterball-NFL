@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     and_,
     or_,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, foreign
 
@@ -219,6 +220,10 @@ class Poll(Base):
     )
     game: Mapped[Game] = relationship(
         back_populates="polls",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("channel_id", "game_id", name="uq_poll_channel_game"),
     )
 
 
