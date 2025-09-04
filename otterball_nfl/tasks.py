@@ -80,7 +80,7 @@ def update_games(self: Task, season: int):
 def create_polls(self: Task):
     logger.info("Creating polls")
     with Session(engine) as session:
-        stmt = select(models.Channel)
+        stmt = select(models.Channel).where(models.Channel.active == True)
         channels: set[models.Channel] = set(session.scalars(stmt).all())
         stmt = select(models.Game).where(
             models.Game.kickoff.between(

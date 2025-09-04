@@ -27,6 +27,12 @@ class Channel(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     name: Mapped[str] = mapped_column(String, unique=True)
     role_id: Mapped[int] = mapped_column(BigInteger)
+    active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        insert_default=False,
+    )
 
     bets: Mapped[list[Bet]] = relationship(
         back_populates="channel",

@@ -153,7 +153,12 @@ class MyClient(discord.Client):
     async def create_new_polls(self):
         new_polls: list[models.Poll] = []
         with Session(self.db) as session:
-            stmt = select(models.Poll).where(models.Poll.message_id == None)
+            stmt = (
+                select(models.Poll)
+                .join(models.Channel)
+                .where(models.Channel.active == True)
+                .where(models.Poll.message_id == None)
+            )
             for db_poll in session.scalars(stmt).all():
                 new_polls.append(db_poll)
         for db_poll in new_polls:
@@ -197,6 +202,8 @@ class MyClient(discord.Client):
             stmt = (
                 select(models.Poll)
                 .join(models.Game)
+                .join(models.Channel)
+                .where(models.Channel.active == True)
                 .where(models.Poll.result_posted == False)
                 .where(models.Game.result != None)
             )
@@ -249,7 +256,7 @@ class MyClient(discord.Client):
     async def post_leaderboards(self):
         channels: dict[int, dict[int, int]] = {}
         with Session(self.db) as session:
-            stmt = select(models.Channel)
+            stmt = select(models.Channel).where(models.Channel.active == True)
             for channel in session.scalars(stmt).all():
                 leaderboard: dict[int, int] = channels[channel.id]
                 for bet in channel.bets:
