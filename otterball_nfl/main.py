@@ -38,6 +38,70 @@ class MyClient(discord.Client):
         self.close_polls.start()
         self.create_new_polls.start()
         self.post_results.start()
+        self.sync_bets.start()
+
+    async def sync_poll_bets(self, db_poll_id):
+        with Session(self.db) as session:
+            db_poll: models.Poll | None = session.get(models.Poll, db_poll_id)
+            if not db_poll:
+                raise Exception("Poll not found")
+            channel = await self.get_or_fetch_channel(db_poll.channel_id)
+            message = await channel.fetch_message(db_poll.message_id)
+            poll = message.poll
+            voter_ids: set[int] = set()
+            for answer in poll.answers:
+                async for voter in answer.voters():
+                    voter_ids.add(voter.id)
+                    db_user = session.get(models.User, voter.id)
+                    if not db_user:
+                        db_user = models.User(id=voter.id, username=voter.name)
+                        session.add(db_user)
+                    stmt = (
+                        select(models.Bet)
+                        .where(models.Bet.user_id == voter.id)
+                        .where(models.Bet.game_id == db_poll.game_id)
+                        .where(models.Bet.channel_id == db_poll.channel_id)
+                    )
+                    db_bet = session.scalars(stmt).first()
+                    if db_bet:
+                        db_bet.choice = answer.id - 1
+                    else:
+                        db_bet = models.Bet(
+                            user_id=voter.id,
+                            game_id=db_poll.game_id,
+                            channel_id=db_poll.channel_id,
+                            choice=answer.id - 1,
+                        )
+                        session.add(db_bet)
+
+            stmt = (
+                select(models.Bet)
+                .where(models.Bet.game_id == db_poll.game_id)
+                .where(models.Bet.channel_id == db_poll.channel_id)
+                .where(models.Bet.user_id.notin_(voter_ids))
+            )
+            for deleted_bet in session.scalars(stmt).all():
+                session.delete(deleted_bet)
+
+            session.commit()
+
+    @tasks.loop(minutes=5)
+    async def sync_bets(self):
+        db_polls: list[models.Poll] = []
+        with Session(self.db) as session:
+            stmt = select(models.Poll).where(models.Poll.closed == False)
+            for db_poll in session.scalars(stmt).all():
+                db_polls.append(db_poll)
+        for db_poll in db_polls:
+            try:
+                await self.sync_poll_bets(db_poll.id)
+            except Exception as e:
+                logger.error(e)
+                continue
+
+    @sync_bets.before_loop
+    async def before_sync_bets(self):
+        await self.wait_until_ready()
 
     async def post_poll(self, poll_id: int):
         with Session(self.db) as session:
@@ -55,7 +119,7 @@ class MyClient(discord.Client):
             home_emoji = await self.fetch_application_emoji(home_team.emoji_id)
             away_emoji = await self.fetch_application_emoji(away_team.emoji_id)
 
-            channel = await self.fetch_channel(db_channel.id)
+            channel = await self.get_or_fetch_channel(db_channel.id)
             poll = discord.Poll(
                 PollMedia(f"{home_team.name} - {away_team.name}"),
                 duration=(
@@ -122,6 +186,7 @@ class MyClient(discord.Client):
 
     @tasks.loop(seconds=10)
     async def close_polls(self):
+        poll_ids: list[int] = []
         with Session(self.db) as session:
             stmt = (
                 select(models.Poll)
@@ -130,8 +195,9 @@ class MyClient(discord.Client):
                 .where(models.Game.kickoff <= datetime.datetime.now(ZoneInfo("UTC")))
             )
             for poll in session.scalars(stmt).all():
+                poll_ids.append(poll.id)
                 try:
-                    channel = await self.fetch_channel(poll.channel_id)
+                    channel = await self.get_or_fetch_channel(poll.channel_id)
                     message = await channel.fetch_message(poll.message_id)
                     if message.poll.victor_answer is not None:
                         await message.poll.end()
@@ -142,9 +208,11 @@ class MyClient(discord.Client):
                     logger.error(e)
                     continue
             session.commit()
+        for poll_id in poll_ids:
+            await self.sync_poll_bets(poll_id)
 
     @close_polls.before_loop
-    async def before_check_polls(self):
+    async def before_close_polls(self):
         await self.wait_until_ready()
 
     @tasks.loop(seconds=10)
@@ -230,7 +298,7 @@ class MyClient(discord.Client):
                     )
                 channels[channel.id] = leaderboard
         for channel_id, leaderboard in channels.items():
-            channel = await self.fetch_channel(channel_id)
+            channel = await self.get_or_fetch_channel(channel_id)
             leaderboard_str = "# Leaderboard:\n```"
             for idx, (user_id, points) in enumerate(
                 sorted(leaderboard.items(), key=lambda x: x[1], reverse=True)
