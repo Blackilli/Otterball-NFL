@@ -235,7 +235,7 @@ class GameTypeScaling(Base):
     gametype_id: Mapped[str] = mapped_column(
         ForeignKey("gametype.id"), primary_key=True
     )
-    factor: Mapped[int] = mapped_column(Integer)
+    factor: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
     channel: Mapped[Channel] = relationship(
         back_populates="gametype_scaling",

@@ -398,6 +398,7 @@ class MyClient(discord.Client):
 
     async def init_db(self):
         await self.populate_game_types()
+        await self.populate_game_type_scaling()
         await self.populate_all_teams()
 
     async def populate_team(self, team: pd.Series, emoji_id: int = 0):
@@ -409,16 +410,21 @@ class MyClient(discord.Client):
             )
             emoji_id = emoji.id
         with Session(self.db) as session:
-            stmt = select(Team).where(Team.id == team.team_abbr)
-            if session.scalars(stmt).first():
-                return
-            db_team = Team(
-                id=team.team_abbr,
-                name=team.team_name,
-                logo=team.team_logo_wikipedia,
-                emoji_id=emoji_id,
-            )
-            session.add(db_team)
+            db_team: models.Team | None = session.get(models.Team, team.team_abbr)
+            if db_team:
+                db_team.name = team.team_name
+                db_team.logo = team.team_logo_wikipedia
+                db_team.emoji_id = emoji_id
+                db_team.color = team.team_color
+            else:
+                db_team = Team(
+                    id=team.team_abbr,
+                    name=team.team_name,
+                    logo=team.team_logo_wikipedia,
+                    emoji_id=emoji_id,
+                    color=team.team_color,
+                )
+                session.add(db_team)
             session.commit()
 
     async def populate_all_teams(self):
@@ -457,10 +463,36 @@ class MyClient(discord.Client):
         with Session(self.db) as session:
             for game_type in game_types:
                 try:
+                    db_game_type: models.GameType | None = session.get(
+                        models.GameType, game_type.id
+                    )
+                    if db_game_type:
+                        return
                     session.add(game_type)
                     session.commit()
                 except Exception as e:
                     logger.error(e)
+
+    async def populate_game_type_scaling(self):
+        with Session(self.db) as session:
+            stmt = select(models.GameType)
+            game_types = session.scalars(stmt).all()
+            stmt = select(models.Channel)
+            channels = session.scalars(stmt).all()
+            for game_type in game_types:
+                for channel in channels:
+                    game_type_scaling: models.GameTypeScaling | None = session.get(
+                        models.GameTypeScaling, (channel.id, game_type.id)
+                    )
+                    if game_type_scaling:
+                        continue
+                    game_type_scaling = models.GameTypeScaling(
+                        channel_id=channel.id,
+                        gametype_id=game_type.id,
+                        factor=1,
+                    )
+                    session.add(game_type_scaling)
+            session.commit()
 
     async def on_ready(self):
         print(f"Logged on as {self.user}!")
