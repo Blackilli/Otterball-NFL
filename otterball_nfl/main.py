@@ -97,6 +97,7 @@ class MyClient(discord.Client):
                 db_poll.message_id = msg.id
                 session.add(db_poll)
                 session.commit()
+                await msg.pin()
             except HTTPException as e:
                 logger.error(e)
 
@@ -135,6 +136,8 @@ class MyClient(discord.Client):
                     if message.poll.victor_answer is not None:
                         await message.poll.end()
                     poll.closed = True
+                    if message.pinned:
+                        await message.unpin()
                 except Exception as e:
                     logger.error(e)
                     continue
