@@ -175,7 +175,7 @@ class MyClient(discord.Client):
                     if poll.game.outcome == models.Outcome.TIE:
                         result_txt += "It's a tie, no one won!!! \n-# lol not gonna happen anyway. I want to thank my mom <3"
                     else:
-                        winner_emoji = self.fetch_application_emoji(
+                        winner_emoji = await self.fetch_application_emoji(
                             poll.game.winner.emoji_id
                         )
                         result_txt += f"The winner is {winner_emoji} {poll.game.winner.name} {winner_emoji}!\n"
