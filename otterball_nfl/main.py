@@ -258,7 +258,7 @@ class MyClient(discord.Client):
                     winner_bets: list[models.Bet] = list(session.scalars(stmt).all())
                     for bet in winner_bets:
                         user = await self.get_or_fetch_user(bet.user_id)
-                        result_txt += f"{user.name}, "
+                        result_txt += f"{user.display_name}, ".replace("_", r"\_")
                     if len(winner_bets) == 0:
                         result_txt += "nobody......... What is wrong with you guys?!"
                     else:
