@@ -273,6 +273,12 @@ class Bet(Base):
         back_populates="bets",
     )
 
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "game_id", "channel_id", name="uq_bet_user_game_channel"
+        ),
+    )
+
     @property
     def earned_points(self):
         if self.choice == self.game.outcome:
