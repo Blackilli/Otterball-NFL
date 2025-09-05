@@ -239,31 +239,65 @@ class MyClient(discord.Client):
                         raise Exception("Poll not found")
                     channel = await self.get_or_fetch_channel(poll.channel_id)
                     poll_msg = await channel.fetch_message(poll.message_id)
-                    result_txt = "The game has ended!\n"
-                    if poll.game.outcome == models.Outcome.TIE:
-                        result_txt += "It's a tie, no one won!!! \n-# lol not gonna happen anyway. I want to thank my mom <3"
-                    else:
-                        winner_emoji = await self.fetch_application_emoji(
-                            poll.game.winner.emoji_id
+                    db_game: models.Game | None = session.get(
+                        models.Game, db_poll.game_id
+                    )
+                    scaling: models.GameTypeScaling | None = session.get(
+                        models.GameTypeScaling,
+                        (db_poll.channel_id, db_game.gametype_id),
+                    )
+
+                    embed = discord.Embed(
+                        title=f"**Final Score**",
+                        description=f"{db_game.gametype.name} ({scaling.factor} Otter Point{'' if scaling.factor == 1 else 's'})",
+                        color=(
+                            discord.Colour.from_str(db_game.winner.color)
+                            if db_game.outcome != models.Outcome.TIE
+                            and db_game.winner.color
+                            else discord.Colour.blue()
+                        ),
+                    )
+                    embed.add_field(
+                        name=db_game.home_team.name,
+                        value=db_game.home_score,
+                        inline=True,
+                    )
+                    embed.add_field(
+                        name=db_game.away_team.name,
+                        value=db_game.away_score,
+                        inline=True,
+                    )
+                    embed.set_thumbnail(
+                        url=(
+                            db_game.winner.logo
+                            if db_game.winner
+                            else "https://static.wikia.nocookie.net/memepediadankmemes/images/c/cc/Wat8.jpg"
                         )
-                        result_txt += f"The winner is {winner_emoji} {poll.game.winner.name} {winner_emoji}!\n"
-                    result_txt += "-# GG "
+                    )
 
                     stmt = (
                         select(models.Bet)
-                        .where(models.Bet.channel_id == poll.channel_id)
-                        .where(models.Bet.game_id == poll.game_id)
-                        .where(models.Bet.choice == poll.game.outcome)
+                        .where(models.Bet.game_id == db_poll.game_id)
+                        .where(models.Bet.choice == db_game.outcome)
+                        .where(models.Bet.channel_id == db_poll.channel_id)
                     )
-                    winner_bets: list[models.Bet] = list(session.scalars(stmt).all())
-                    for bet in winner_bets:
-                        user = await self.get_or_fetch_user(bet.user_id)
-                        result_txt += f"{user.display_name}, ".replace("_", r"\_")
-                    if len(winner_bets) == 0:
-                        result_txt += "nobody......... What is wrong with you guys?!"
+                    footer_text = ""
+                    for db_bet in session.scalars(stmt).all():
+                        try:
+                            user = await self.get_or_fetch_user(db_bet.user_id)
+                            footer_text += f"{user.mention}, "
+                        except Exception as e:
+                            logger.error(e)
+                            footer_text += f"{db_bet.user.username}, "
+                            continue
+                    if len(footer_text) == 0:
+                        footer_text += (
+                            "GG nobody......... What is wrong with you guys?!"
+                        )
                     else:
-                        result_txt = result_txt[:-2]
-                    await poll_msg.reply(result_txt)
+                        footer_text = "GG " + footer_text[:-2]
+                    embed.set_footer(text=footer_text)
+                    await poll_msg.reply(embed=embed)
                     poll.result_posted = True
                     session.commit()
             except Exception as e:

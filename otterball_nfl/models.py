@@ -188,6 +188,7 @@ class Team(Base):
     name: Mapped[str] = mapped_column(String, unique=False)
     logo: Mapped[str] = mapped_column(String)
     emoji_id: Mapped[int] = mapped_column(BigInteger)
+    color: Mapped[str] = mapped_column(String, nullable=True)
 
     games: Mapped[list[Game]] = relationship(
         primaryjoin=or_(id == Game.home_team_id, id == Game.away_team_id),
