@@ -199,7 +199,7 @@ class MyClient(discord.Client):
                 try:
                     channel = await self.get_or_fetch_channel(poll.channel_id)
                     message = await channel.fetch_message(poll.message_id)
-                    if message.poll.victor_answer is not None:
+                    if message.poll.victor_answer is None:
                         await message.poll.end()
                     poll.closed = True
                     if message.pinned:
@@ -246,6 +246,12 @@ class MyClient(discord.Client):
                         models.GameTypeScaling,
                         (db_poll.channel_id, db_game.gametype_id),
                     )
+                    home_team_emoji = await self.fetch_application_emoji(
+                        db_game.home_team.emoji_id
+                    )
+                    awayteam_emoji = await self.fetch_application_emoji(
+                        db_game.away_team.emoji_id
+                    )
 
                     embed = discord.Embed(
                         title=f"**Final Score**",
@@ -258,12 +264,12 @@ class MyClient(discord.Client):
                         ),
                     )
                     embed.add_field(
-                        name=db_game.home_team.name,
+                        name=f"{home_team_emoji} {db_game.home_team.name}",
                         value=db_game.home_score,
                         inline=True,
                     )
                     embed.add_field(
-                        name=db_game.away_team.name,
+                        name=f"{awayteam_emoji} {db_game.away_team.name}",
                         value=db_game.away_score,
                         inline=True,
                     )
@@ -291,13 +297,18 @@ class MyClient(discord.Client):
                             footer_text += f"{db_bet.user.username}, "
                             continue
                     if len(footer_text) == 0:
-                        footer_text += (
-                            "GG nobody......... What is wrong with you guys?!"
-                        )
+                        footer_text += "nobody......... What is wrong with you guys?!"
                     else:
                         footer_text = "GG " + footer_text[:-2]
-                    embed.set_footer(text=footer_text)
-                    await poll_msg.reply(embed=embed)
+                    embed.add_field(
+                        name="---------",
+                        value=footer_text,
+                        inline=False,
+                    )
+                    await poll_msg.reply(
+                        embed=embed,
+                        allowed_mentions=discord.AllowedMentions(users=True),
+                    )
                     poll.result_posted = True
                     session.commit()
             except Exception as e:
