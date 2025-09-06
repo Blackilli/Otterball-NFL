@@ -2,6 +2,7 @@ import datetime
 import enum
 
 import logging
+import traceback
 from zoneinfo import ZoneInfo
 
 logging.basicConfig(
@@ -199,13 +200,13 @@ class MyClient(discord.Client):
                 try:
                     channel = await self.get_or_fetch_channel(poll.channel_id)
                     message = await channel.fetch_message(poll.message_id)
-                    if message.poll.victor_answer is None:
+                    if not message.poll.is_finalised():
                         await message.poll.end()
                     poll.closed = True
                     if message.pinned:
                         await message.unpin()
                 except Exception as e:
-                    logger.error(e)
+                    logger.error(f"Poll {poll.id}: {e}")
                     continue
             session.commit()
         for poll_id in poll_ids:
