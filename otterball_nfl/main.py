@@ -346,7 +346,7 @@ class MyClient(discord.Client):
         with Session(self.db) as session:
             stmt = select(models.Channel).where(models.Channel.active == True)
             for channel in session.scalars(stmt).all():
-                leaderboard: dict[int, int] = channels[channel.id]
+                leaderboard: dict[int, int] = channels.get(channel.id, dict())
                 for bet in channel.bets:
                     leaderboard[bet.user_id] = (
                         leaderboard.get(bet.user_id, 0) + bet.earned_points
@@ -355,13 +355,19 @@ class MyClient(discord.Client):
         for channel_id, leaderboard in channels.items():
             channel = await self.get_or_fetch_channel(channel_id)
             leaderboard_str = "# Leaderboard:\n```"
+            tmp_place: int = 0
+            tmp_points: int = 1e10
             for idx, (user_id, points) in enumerate(
-                sorted(leaderboard.items(), key=lambda x: x[1], reverse=True)
+                sorted(leaderboard.items(), key=lambda x: x[1], reverse=True), start=1
             ):
-                user = await self.fetch_user(user_id)
-                leaderboard_str += f"{idx + 1}. {user.name}: {points}\n"
+                if points < tmp_points:
+                    tmp_place = idx
+                tmp_points = points
+                user = await self.get_or_fetch_user(user_id)
+                leaderboard_str += f"{tmp_place}. {user.display_name}: {points}\n"
             leaderboard_str += "```"
-            await channel.send(leaderboard_str)
+            print(leaderboard_str)
+            # await channel.send(leaderboard_str)
 
         pass
 
@@ -527,6 +533,7 @@ class MyClient(discord.Client):
                 print(f"{guild.name}: {channel} ({channel.id})")
         # await self.update_all_bets()
         print("LOL")
+        await self.post_leaderboards()
 
     async def delete_message_by_link(self, message_link: str):
         channel_id, message_id = message_link.split("/")[-2:]

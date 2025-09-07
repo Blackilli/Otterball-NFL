@@ -14,8 +14,17 @@ from sqlalchemy import (
     and_,
     or_,
     UniqueConstraint,
+    select,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, foreign
+from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    mapped_column,
+    relationship,
+    foreign,
+    column_property,
+)
 
 
 class Base(DeclarativeBase):
@@ -260,14 +269,14 @@ class Bet(Base):
     channel_id: Mapped[int] = mapped_column(ForeignKey("channel.id"))
     choice: Mapped[Outcome] = mapped_column(Enum(Outcome))
 
-    possible_points = relationship(
-        GameTypeScaling,
-        primaryjoin=and_(
-            channel_id == foreign(GameTypeScaling.channel_id),
-            foreign(GameTypeScaling.gametype_id) == Game.gametype_id,
-        ),
-        viewonly=True,
-        uselist=False,
+    possible_points = column_property(
+        select(GameTypeScaling.factor)
+        .join(Game, GameTypeScaling.gametype_id == Game.gametype_id)
+        .where(
+            GameTypeScaling.channel_id == channel_id,
+            Game.id == game_id,
+        )
+        .scalar_subquery()
     )
 
     user: Mapped[User] = relationship(
@@ -289,7 +298,5 @@ class Bet(Base):
     @property
     def earned_points(self):
         if self.choice == self.game.outcome:
-            pass
-        elif self.possible_points:
-            return self.possible_points.factor
+            return self.possible_points
         return 0
