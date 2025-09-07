@@ -28,6 +28,12 @@ class Channel(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     name: Mapped[str] = mapped_column(String, unique=True)
     role_id: Mapped[int] = mapped_column(BigInteger)
+    delete_result_msg: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        server_default="true",
+        insert_default=True,
+    )
     active: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
