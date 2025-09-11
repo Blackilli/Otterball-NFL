@@ -32,19 +32,11 @@ logger = logging.getLogger("mybot")
 class MyClient(discord.Client):
     db: sqlalchemy.engine.Engine
 
-    delete_result_msg_for: set[int] = set()
-
     def __init__(self, db_engine: sqlalchemy.engine.Engine, *args, **kwargs):
         self.db = db_engine
         super().__init__(*args, **kwargs)
 
     async def setup_hook(self) -> None:
-        with Session(self.db) as session:
-            stmt = select(models.Channel).where(
-                models.Channel.delete_result_msg == True
-            )
-            for channel in session.scalars(stmt).all():
-                self.delete_result_msg_for.add(channel.id)
         self.close_polls.start()
         self.create_new_polls.start()
         self.post_results.start()
@@ -546,9 +538,14 @@ class MyClient(discord.Client):
             match message.type:
                 case discord.MessageType.default:
                     pass
-                case discord.MessageType.poll_result:
-                    if message.id in self.delete_result_msg_for:
-                        await message.delete()
+                case discord.MessageType.poll_result | discord.MessageType.pins_add:
+                    with Session(self.db) as session:
+                        db_channel: models.Channel | None = session.get(
+                            models.Channel, message.channel.id
+                        )
+                        if db_channel.delete_result_msg:
+                            await message.delete()
+
         logger.debug(f"Message from {message.author}: {message.content}")
         logger.debug(f"Channel: {message.channel.id}")
 
