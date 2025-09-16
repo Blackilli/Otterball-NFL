@@ -5,7 +5,7 @@ services:
     ports:
       - "5672:5672"
     env_file:
-      - .env
+      - stack.env
     healthcheck:
       test: rabbitmq-diagnostics -q ping
       interval: 10s
@@ -20,7 +20,7 @@ services:
     ports:
       - "5432:5432"
     env_file:
-      - .env
+      - stack.env
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 10s
@@ -34,7 +34,7 @@ services:
     build: .
     restart: unless-stopped
     env_file:
-      - .env
+      - stack.env
 
     develop:
       watch:
@@ -61,7 +61,7 @@ services:
     command: uv run -- celery -A otterball_nfl.tasks worker --loglevel=INFO
     restart: unless-stopped
     env_file:
-      - .env
+      - stack.env
 
     develop:
       watch:
@@ -88,7 +88,7 @@ services:
     command: uv run -- celery -A otterball_nfl.tasks beat --loglevel=INFO
     restart: unless-stopped
     env_file:
-      - .env
+      - stack.env
 
     develop:
       watch:
