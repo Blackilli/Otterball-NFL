@@ -125,7 +125,9 @@ class MyClient(discord.Client):
             poll = discord.Poll(
                 PollMedia(f"{home_team.name} - {away_team.name}"),
                 duration=(
-                    db_game.kickoff - datetime.datetime.now(datetime.timezone.utc)
+                    db_game.kickoff
+                    - datetime.datetime.now(datetime.timezone.utc)
+                    + datetime.timedelta(hours=1)
                 ),
             )
             for answer in sorted(models.Outcome):
@@ -148,14 +150,8 @@ class MyClient(discord.Client):
                 content += f"\n### 📅   <t:{int(db_game.kickoff.timestamp())}:F> "
                 content += f"\n### ⏳   <t:{int(db_game.kickoff.timestamp())}:R>"
                 content += (
-                    f"\n-# Polls may close early, so don't vote on the last second "
+                    f"\n-# Polls may close early, so don't vote on the last second"
                 )
-
-                if db_channel.role_id:
-                    content += (
-                        await channel.guild.fetch_role(db_channel.role_id)
-                    ).mention
-
                 msg = await channel.send(
                     content=content,
                     poll=poll,
@@ -170,6 +166,7 @@ class MyClient(discord.Client):
     @tasks.loop(seconds=10)
     async def create_new_polls(self):
         new_polls: list[models.Poll] = []
+        channels_with_new_polls: set[models.Channel] = set()
         with Session(self.db) as session:
             stmt = (
                 select(models.Poll)
@@ -179,6 +176,18 @@ class MyClient(discord.Client):
             )
             for db_poll in session.scalars(stmt).all():
                 new_polls.append(db_poll)
+                channels_with_new_polls.add(db_poll.channel)
+        for db_channel in channels_with_new_polls:
+            channel = await self.get_or_fetch_channel(db_channel.id)
+            role = (
+                await channel.guild.fetch_role(db_channel.role_id)
+                if db_channel.role_id
+                else None
+            )
+            msg = await channel.send(
+                content=f"New Polls are incoming! Good luck everybody{" " + role.mention if role else ""}",
+                allowed_mentions=discord.AllowedMentions.all(),
+            )
         for db_poll in new_polls:
             await self.post_poll(db_poll.id)
 
