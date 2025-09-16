@@ -372,7 +372,7 @@ class MyClient(discord.Client):
                     f"{tmp_place}. {user.mention} ({user.display_name}): {points}\n"
                 )
             leaderboard_str += "```"
-            leaderboard_str += f"\n-# Last update: <t:{int(datetime.datetime.now(ZoneInfo("UTC")).timestamp())}:F>"
+            leaderboard_str += f"\n-# Last update: <t:{int(datetime.datetime.now(ZoneInfo('UTC')).timestamp())}:F>"
             with Session(self.db) as session:
                 db_channel = session.get(models.Channel, channel_id)
                 if db_channel:
