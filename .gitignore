@@ -480,3 +480,5 @@ fabric.properties
 ###
 
 alembic.ini
+.rabbitmq/
+.pgdata/

@@ -1,6 +1,7 @@
 services:
   rabbitmq:
     image: rabbitmq
+    restart: always
     ports:
       - "5672:5672"
     env_file:
@@ -11,7 +12,7 @@ services:
       timeout: 30s
       retries: 3
     volumes:
-      - rabbitmq:/var/lib/rabbitmq
+      - ./.rabbitmq:/var/lib/rabbitmq
 
   db:
     image: postgres:17-alpine
@@ -27,11 +28,11 @@ services:
       start_period: 30s
       timeout: 10s
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./.pgdata:/var/lib/postgresql/data
 
   app:
     build: .
-
+    restart: unless-stopped
     env_file:
       - .env
 
@@ -58,7 +59,7 @@ services:
   app-worker:
     build: .
     command: uv run -- celery -A otterball_nfl.tasks worker --loglevel=INFO
-
+    restart: unless-stopped
     env_file:
       - .env
 
@@ -85,7 +86,7 @@ services:
   app-scheduler:
     build: .
     command: uv run -- celery -A otterball_nfl.tasks beat --loglevel=INFO
-
+    restart: unless-stopped
     env_file:
       - .env
 
@@ -108,7 +109,3 @@ services:
       rabbitmq:
         condition: service_healthy
         restart: true
-
-volumes:
-  pgdata:
-  rabbitmq:
