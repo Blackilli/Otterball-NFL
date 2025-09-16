@@ -533,7 +533,7 @@ class MyClient(discord.Client):
             for channel in channels:
                 print(f"{guild.name}: {channel} ({channel.id})")
         # await self.update_all_bets()
-        print("LOL")
+        print("LOL1")
         await self.post_leaderboards()
 
     async def delete_message_by_link(self, message_link: str):
