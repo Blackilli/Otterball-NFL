@@ -14,7 +14,7 @@ services:
       timeout: 30s
       retries: 3
     volumes:
-      - ./.rabbitmq:/var/lib/rabbitmq
+      - ../rabbitmq:/var/lib/rabbitmq
 
   db:
     image: postgres:17-alpine
@@ -32,7 +32,7 @@ services:
       start_period: 30s
       timeout: 10s
     volumes:
-      - ./.pgdata:/var/lib/postgresql/data
+      - ../pgdata:/var/lib/postgresql/data
 
   app:
     build: .
