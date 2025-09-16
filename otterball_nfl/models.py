@@ -37,6 +37,7 @@ class Channel(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     name: Mapped[str] = mapped_column(String, unique=True)
     role_id: Mapped[int] = mapped_column(BigInteger)
+    leaderboard_msg_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
     delete_result_msg: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
