@@ -326,6 +326,9 @@ class MyClient(discord.Client):
                 logger.error(e)
                 continue
 
+        if polls:
+            await self.post_leaderboards()
+
     @post_results.before_loop
     async def before_post_results(self):
         await self.wait_until_ready()
@@ -365,12 +368,31 @@ class MyClient(discord.Client):
                     tmp_place = idx
                 tmp_points = points
                 user = await self.get_or_fetch_user(user_id)
-                leaderboard_str += f"{tmp_place}. {user.display_name}: {points}\n"
+                leaderboard_str += (
+                    f"{tmp_place}. {user.mention} ({user.display_name}): {points}\n"
+                )
             leaderboard_str += "```"
-            print(leaderboard_str)
-            # await channel.send(leaderboard_str)
-
-        pass
+            leaderboard_str += f"\n-# Last update: <t:{int(datetime.datetime.now(ZoneInfo("UTC")).timestamp())}:F>"
+            with Session(self.db) as session:
+                db_channel = session.get(models.Channel, channel_id)
+                if db_channel:
+                    if db_channel.leaderboard_msg_id:
+                        msg = await channel.fetch_message(db_channel.leaderboard_msg_id)
+                        await msg.edit(
+                            content=leaderboard_str,
+                            allowed_mentions=discord.AllowedMentions.none(),
+                        )
+                    else:
+                        msg = await channel.send(
+                            content=leaderboard_str,
+                            allowed_mentions=discord.AllowedMentions.none(),
+                        )
+                        await msg.pin()
+                        db_channel.leaderboard_msg_id = msg.id
+                    session.commit()
+                else:
+                    logger.error(f"Channel {channel_id} not found")
+                    continue
 
     async def update_all_bets(self):
         found_user: set[int] = set()
