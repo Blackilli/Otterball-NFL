@@ -368,9 +368,7 @@ class MyClient(discord.Client):
                     tmp_place = idx
                 tmp_points = points
                 user = await self.get_or_fetch_user(user_id)
-                leaderboard_str += (
-                    f"{tmp_place}. {user.mention} ({user.display_name}): {points}\n"
-                )
+                leaderboard_str += f"{tmp_place}. {user.display_name}: {points}\n"
             leaderboard_str += "```"
             leaderboard_str += f"\n-# Last update: <t:{int(datetime.datetime.now(ZoneInfo('UTC')).timestamp())}:F>"
             with Session(self.db) as session:
