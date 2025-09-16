@@ -185,7 +185,7 @@ class MyClient(discord.Client):
                 else None
             )
             msg = await channel.send(
-                content=f"New Polls are incoming! Good luck everybody{" " + role.mention if role else ""}",
+                content=f"New Polls are incoming! Good luck everybody{' ' + role.mention if role else ''}",
                 allowed_mentions=discord.AllowedMentions.all(),
             )
         for db_poll in new_polls:
