@@ -386,10 +386,18 @@ class MyClient(discord.Client):
                 user_str = user.display_name
                 if channel_id == 1410581071220838521 and user_str == "Tephaine":
                     user_str = await channel.guild.fetch_emoji(1413678151661518950)
-                embed.fields[-1].value += (
-                    ("\n" if len(embed.fields[-1].value) != 0 else "")
-                    + (f"{tmp_place}. " if tmp_place > 10 else "")
-                    + f"{user_str}: {points}"
+
+                old_field = embed.fields[tmp_place - 1]
+                embed.set_field_at(
+                    tmp_place - 1,
+                    name=old_field.name,
+                    value=(
+                        old_field.value
+                        + ("\n" if len(old_field.value) != 0 else "")
+                        + (f"{tmp_place}. " if tmp_place > 10 else "")
+                        + f"{user_str}: {points}"
+                    ),
+                    inline=old_field.inline,
                 )
             with Session(self.db) as session:
                 db_channel = session.get(models.Channel, channel_id)
