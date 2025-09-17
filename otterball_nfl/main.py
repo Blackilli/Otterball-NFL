@@ -368,7 +368,10 @@ class MyClient(discord.Client):
                     tmp_place = idx
                 tmp_points = points
                 user = await self.get_or_fetch_user(user_id)
-                leaderboard_str += f"{tmp_place}. {user.display_name}: {points}\n"
+                user_str = user.display_name
+                if channel_id == 1410581071220838521 and user_str == "Tephaine":
+                    user_str = await channel.guild.fetch_emoji(1413678151661518950)
+                leaderboard_str += f"{tmp_place}. {user_str}: {points}\n"
             leaderboard_str += "```"
             leaderboard_str += f"\n-# Last update: <t:{int(datetime.datetime.now(ZoneInfo('UTC')).timestamp())}:F>"
             with Session(self.db) as session:
