@@ -386,9 +386,11 @@ class MyClient(discord.Client):
                 user_str = user.display_name
                 if channel_id == 1410581071220838521 and user_str == "Tephaine":
                     user_str = await channel.guild.fetch_emoji(1413678151661518950)
-                embed.fields[
-                    tmp_place - 1 if tmp_place <= 10 else 10
-                ].value += f"{user_str}: {points}\n"
+                embed.fields[-1].value += (
+                    ("\n" if len(embed.fields[-1].value) != 0 else "")
+                    + (f"{tmp_place}. " if tmp_place > 10 else "")
+                    + f"{user_str}: {points}"
+                )
             with Session(self.db) as session:
                 db_channel = session.get(models.Channel, channel_id)
                 if db_channel:
