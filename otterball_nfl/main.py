@@ -399,7 +399,7 @@ class MyClient(discord.Client):
 
             for i in range(1, 10):
                 if i not in embed_field_values:
-                    embed_field_values[i] = "---"
+                    embed_field_values[i] = "> ---"
 
             for place, field_value in sorted(
                 embed_field_values.items(), key=lambda x: x[0]
