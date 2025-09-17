@@ -344,7 +344,7 @@ class MyClient(discord.Client):
         return channel
 
     async def post_leaderboard_for_channel(self, channel_id: int):
-        leaderboard: dict[int, list[int]] = dict()
+        leaderboard: dict[int, set[int]] = dict()
         with Session(self.db) as session:
             db_channel: models.Channel | None = session.get(models.Channel, channel_id)
             if not db_channel:
@@ -361,9 +361,9 @@ class MyClient(discord.Client):
                     if bet.channel_id == channel_id:
                         score += bet.earned_points
                 if score in leaderboard:
-                    leaderboard[score].append(user.id)
+                    leaderboard[score].add(user.id)
                 else:
-                    leaderboard[score] = [user.id]
+                    leaderboard[score] = {user.id}
             channel = await self.get_or_fetch_channel(channel_id)
             embed = discord.Embed(
                 title="🏈 **Leaderboard** 🏈",
