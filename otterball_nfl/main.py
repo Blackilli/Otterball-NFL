@@ -420,6 +420,7 @@ class MyClient(discord.Client):
                         embed.add_field(
                             name=f"The Rest", value=field_value, inline=False
                         )
+            logger.info(embed.to_dict())
             if db_channel.leaderboard_msg_id:
                 msg = await channel.fetch_message(db_channel.leaderboard_msg_id)
                 await msg.edit(
