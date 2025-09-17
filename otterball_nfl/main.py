@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import enum
 
 import logging
 import traceback
@@ -23,7 +22,6 @@ from sqlalchemy.orm import Session
 
 import models
 import settings
-from models import Base, Team, Game, GameType, Channel
 from sqlalchemy import create_engine
 
 logger = logging.getLogger("mybot")
@@ -379,9 +377,8 @@ class MyClient(discord.Client):
             ):
                 users: list[discord.User] = []
                 for user_id in user_ids:
-                    users.append(await self.get_or_fetch_user(user_id))
+                    users.append((await self.get_or_fetch_user(user_id)))
                 field_idx = place if place <= 10 else 11
-
                 if field_idx in embed_field_values:
                     embed_field_values[field_idx] += "\n"
                 embed_field_values[field_idx] = embed_field_values.get(
@@ -389,7 +386,7 @@ class MyClient(discord.Client):
                 ) + "\n".join(
                     [
                         (f"{place}. " if place > 10 else "")
-                        + f"{user.username}: {score}"
+                        + f"{user.display_name}: {score}"
                         for user in users
                     ]
                 )
@@ -520,7 +517,7 @@ class MyClient(discord.Client):
                 db_team.emoji_id = emoji_id
                 db_team.color = team.team_color
             else:
-                db_team = Team(
+                db_team = models.Team(
                     id=team.team_abbr,
                     name=team.team_name,
                     logo=team.team_logo_wikipedia,
@@ -542,23 +539,23 @@ class MyClient(discord.Client):
 
     async def populate_game_types(self):
         game_types = [
-            GameType(
+            models.GameType(
                 id="REG",
                 name="Regular Season",
             ),
-            GameType(
+            models.GameType(
                 id="DIV",
                 name="Divisional Round",
             ),
-            GameType(
+            models.GameType(
                 id="WC",
                 name="Wild Card Round",
             ),
-            GameType(
+            models.GameType(
                 id="CON",
                 name="Conference Championship",
             ),
-            GameType(
+            models.GameType(
                 id="SB",
                 name="Super Bowl",
             ),
@@ -641,7 +638,7 @@ def main():
     intents.messages = True
 
     engine = create_engine(settings.DB_CONNECTION_STRING, echo=False)
-    Base.metadata.create_all(engine)
+    models.Base.metadata.create_all(engine)
 
     client = MyClient(intents=intents, db_engine=engine)
     client.run(settings.DISCORD_BOT_TOKEN)
