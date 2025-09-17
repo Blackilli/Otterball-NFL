@@ -365,40 +365,37 @@ class MyClient(discord.Client):
             )
             tmp_place: int = 0
             tmp_points: int = 1e10
+            leaderboard_strings: dict[int, str] = {}  # TODO: change awful naming
             for idx, (user_id, points) in enumerate(
                 sorted(leaderboard.items(), key=lambda x: x[1], reverse=True), start=1
             ):
                 if points < tmp_points:
                     tmp_place = idx
-                    match tmp_place:
-                        case 1:
-                            embed.add_field(name="1st Place", value="", inline=True)
-                        case 2:
-                            embed.add_field(name="2nd Place", value="", inline=True)
-                        case 3:
-                            embed.add_field(name="3rd Place", value="", inline=True)
-                        case x if 3 < x <= 10:
-                            embed.add_field(name=f"{x}th Place", value="", inline=True)
-                        case 11:
-                            embed.add_field(name=f"The Rest", value="", inline=False)
                 tmp_points = points
                 user = await self.get_or_fetch_user(user_id)
                 user_str = user.display_name
                 if channel_id == 1410581071220838521 and user_str == "Tephaine":
                     user_str = await channel.guild.fetch_emoji(1413678151661518950)
 
-                old_field = embed.fields[tmp_place - 1]
-                embed.set_field_at(
-                    tmp_place - 1,
-                    name=old_field.name,
-                    value=(
-                        old_field.value
-                        + ("\n" if len(old_field.value) != 0 else "")
-                        + (f"{tmp_place}. " if tmp_place > 10 else "")
-                        + f"{user_str}: {points}"
-                    ),
-                    inline=old_field.inline,
+                leaderboard_strings[tmp_place if tmp_place <= 10 else 11] = (
+                    leaderboard_strings.get(tmp_place if tmp_place <= 10 else 11, "")
+                    + (f"{tmp_place}. " if tmp_place > 10 else "")
+                    + f"{user_str}: {points}\n"
                 )
+            for place, value in sorted(leaderboard_strings.items(), key=lambda x: x[0]):
+                value = value[:-2]
+                match place:
+                    case 1:
+                        embed.add_field(name="1st Place", value=value, inline=True)
+                    case 2:
+                        embed.add_field(name="2nd Place", value=value, inline=True)
+                    case 3:
+                        embed.add_field(name="3rd Place", value=value, inline=True)
+                    case x if 3 < x <= 10:
+                        embed.add_field(name=f"{x}th Place", value=value, inline=True)
+                    case 11:
+                        embed.add_field(name=f"The Rest", value=value, inline=False)
+
             with Session(self.db) as session:
                 db_channel = session.get(models.Channel, channel_id)
                 if db_channel:
