@@ -345,82 +345,107 @@ class MyClient(discord.Client):
             channel = await self.fetch_channel(channel_id)
         return channel
 
-    async def post_leaderboards(self):
-        channels: dict[int, dict[int, int]] = {}
+    async def post_leaderboard_for_channel(self, channel_id: int):
+        leaderboard: dict[int, list[int]] = dict()
         with Session(self.db) as session:
-            stmt = select(models.Channel).where(models.Channel.active == True)
-            for channel in session.scalars(stmt).all():
-                leaderboard: dict[int, int] = channels.get(channel.id, dict())
-                for bet in channel.bets:
-                    leaderboard[bet.user_id] = (
-                        leaderboard.get(bet.user_id, 0) + bet.earned_points
-                    )
-                channels[channel.id] = leaderboard
-        for channel_id, leaderboard in channels.items():
+            db_channel: models.Channel | None = session.get(models.Channel, channel_id)
+            if not db_channel:
+                raise Exception("Channel not found")
+            stmt = (
+                select(models.User)
+                .join(models.Bet)
+                .where(models.Bet.channel_id == channel_id)
+            )
+            for user in session.scalars(stmt).all():
+                user: models.User
+                score = 0
+                for bet in user.bets:
+                    if bet.channel_id == channel_id:
+                        score += bet.earned_points
+                if score in leaderboard:
+                    leaderboard[score].append(user.id)
+                else:
+                    leaderboard[score] = [user.id]
             channel = await self.get_or_fetch_channel(channel_id)
             embed = discord.Embed(
                 title="🏈 **Leaderboard** 🏈",
                 color=0x6434C9,
                 timestamp=datetime.datetime.now(ZoneInfo("UTC")),
             )
-            tmp_place: int = 0
-            tmp_points: int = 1e10
-            leaderboard_strings: dict[int, str] = {}  # TODO: change awful naming
-            for idx, (user_id, points) in enumerate(
-                sorted(leaderboard.items(), key=lambda x: x[1], reverse=True), start=1
+            embed_field_values: dict[int, str] = dict()
+            place = 1
+            for score, user_ids in sorted(
+                leaderboard.items(), key=lambda x: x[0], reverse=True
             ):
-                if points < tmp_points:
-                    tmp_place = idx
-                tmp_points = points
-                user = await self.get_or_fetch_user(user_id)
-                user_str = user.display_name
-                if channel_id == 1410581071220838521 and user_str == "Tephaine":
-                    user_str = await channel.guild.fetch_emoji(1413678151661518950)
+                users: list[discord.User] = []
+                for user_id in user_ids:
+                    users.append(await self.get_or_fetch_user(user_id))
+                field_idx = place if place <= 10 else 11
 
-                leaderboard_strings[tmp_place if tmp_place <= 10 else 11] = (
-                    leaderboard_strings.get(tmp_place if tmp_place <= 10 else 11, "")
-                    + (f"{tmp_place}. " if tmp_place > 10 else "")
-                    + f"{user_str}: {points}\n"
+                if field_idx in embed_field_values:
+                    embed_field_values[field_idx] += "\n"
+                embed_field_values[field_idx] = embed_field_values.get(
+                    field_idx, ""
+                ) + "\n".join(
+                    [
+                        (f"{place}. " if place > 10 else "")
+                        + f"{user.username}: {score}"
+                        for user in users
+                    ]
                 )
+                place += len(user_ids)
+
             for i in range(1, 10):
-                if i not in leaderboard_strings:
-                    leaderboard_strings[i] = "---"
-            for place, value in sorted(leaderboard_strings.items(), key=lambda x: x[0]):
-                if value[-1] == "\n":
-                    value = value[:-1]
+                if i not in embed_field_values:
+                    embed_field_values[i] = "---"
+
+            for place, field_value in sorted(
+                embed_field_values.items(), key=lambda x: x[0]
+            ):
                 match place:
                     case 1:
-                        embed.add_field(name="1st Place", value=value, inline=True)
+                        embed.add_field(
+                            name="1st Place", value=field_value, inline=True
+                        )
                     case 2:
-                        embed.add_field(name="2nd Place", value=value, inline=True)
+                        embed.add_field(
+                            name="2nd Place", value=field_value, inline=True
+                        )
                     case 3:
-                        embed.add_field(name="3rd Place", value=value, inline=True)
+                        embed.add_field(
+                            name="3rd Place", value=field_value, inline=True
+                        )
                     case x if 3 < x <= 10:
-                        embed.add_field(name=f"{x}th Place", value=value, inline=True)
+                        embed.add_field(
+                            name=f"{x}th Place", value=field_value, inline=True
+                        )
                     case 11:
-                        embed.add_field(name=f"The Rest", value=value, inline=False)
+                        embed.add_field(
+                            name=f"The Rest", value=field_value, inline=False
+                        )
+            if db_channel.leaderboard_msg_id:
+                msg = await channel.fetch_message(db_channel.leaderboard_msg_id)
+                await msg.edit(
+                    content=None,
+                    embed=embed,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+            else:
+                msg = await channel.send(
+                    embed=embed,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                db_channel.leaderboard_msg_id = msg.id
+            session.commit()
 
-            with Session(self.db) as session:
-                db_channel = session.get(models.Channel, channel_id)
-                if db_channel:
-                    if db_channel.leaderboard_msg_id:
-                        msg = await channel.fetch_message(db_channel.leaderboard_msg_id)
-                        await msg.edit(
-                            content=None,
-                            embed=embed,
-                            allowed_mentions=discord.AllowedMentions.none(),
-                        )
-                    else:
-                        msg = await channel.send(
-                            embed=embed,
-                            allowed_mentions=discord.AllowedMentions.none(),
-                        )
-                        await msg.pin()
-                        db_channel.leaderboard_msg_id = msg.id
-                    session.commit()
-                else:
-                    logger.error(f"Channel {channel_id} not found")
-                    continue
+    async def post_leaderboards(self):
+        channels: set[int] = set()
+        with Session(self.db) as session:
+            stmt = select(models.Channel).where(models.Channel.active == True)
+            for channel in session.scalars(stmt).all():
+                channels.add(channel.id)
+        for channel_id in channels:
+            await self.post_leaderboard_for_channel(channel_id)
 
     async def update_all_bets(self):
         found_user: set[int] = set()
