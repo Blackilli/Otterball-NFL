@@ -366,7 +366,7 @@ class MyClient(discord.Client):
                     leaderboard[score] = {user.id}
             channel = await self.get_or_fetch_channel(channel_id)
             embed = discord.Embed(
-                title="🏈 **Leaderboard** 🏈",
+                title="**Leaderboard**",
                 color=0x6434C9,
                 timestamp=datetime.datetime.now(ZoneInfo("UTC")),
             )
@@ -403,15 +403,15 @@ class MyClient(discord.Client):
                 match place:
                     case 1:
                         embed.add_field(
-                            name="🏆 1st Place 🏆", value=field_value, inline=True
+                            name="🏆 1st Place", value=field_value, inline=True
                         )
                     case 2:
                         embed.add_field(
-                            name="🥈 2nd Place 🥈", value=field_value, inline=True
+                            name="🥈 2nd Place", value=field_value, inline=True
                         )
                     case 3:
                         embed.add_field(
-                            name="🥉 3rd Place 🥉", value=field_value, inline=True
+                            name="🥉 3rd Place", value=field_value, inline=True
                         )
                     case x if 3 < x <= 10:
                         embed.add_field(
