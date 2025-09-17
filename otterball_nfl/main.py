@@ -397,7 +397,7 @@ class MyClient(discord.Client):
                 ) + "\n".join(users_lines)
                 place += len(user_ids)
 
-            for i in range(1, 10):
+            for i in range(1, 11):
                 if i not in embed_field_values:
                     embed_field_values[i] = "> ---"
 
