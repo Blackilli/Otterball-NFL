@@ -358,7 +358,11 @@ class MyClient(discord.Client):
                 channels[channel.id] = leaderboard
         for channel_id, leaderboard in channels.items():
             channel = await self.get_or_fetch_channel(channel_id)
-            leaderboard_str = "# Leaderboard:\n"
+            embed = discord.Embed(
+                title="**Leaderboard**",
+                color=0x00FF00,
+                timestamp=datetime.datetime.now(ZoneInfo("UTC")),
+            )
             tmp_place: int = 0
             tmp_points: int = 1e10
             for idx, (user_id, points) in enumerate(
@@ -366,26 +370,38 @@ class MyClient(discord.Client):
             ):
                 if points < tmp_points:
                     tmp_place = idx
+                    match tmp_place:
+                        case 1:
+                            embed.add_field(name="1st Place", value="", inline=True)
+                        case 2:
+                            embed.add_field(name="2nd Place", value="", inline=True)
+                        case 3:
+                            embed.add_field(name="3rd Place", value="", inline=True)
+                        case x if 3 < x <= 10:
+                            embed.add_field(name=f"{x}th Place", value="", inline=True)
+                        case 11:
+                            embed.add_field(name=f"The Rest", value="", inline=False)
                 tmp_points = points
                 user = await self.get_or_fetch_user(user_id)
                 user_str = user.display_name
                 if channel_id == 1410581071220838521 and user_str == "Tephaine":
                     user_str = await channel.guild.fetch_emoji(1413678151661518950)
-                leaderboard_str += f"{tmp_place}. {user_str}: {points}\n"
-            leaderboard_str += ""
-            leaderboard_str += f"\n-# Last update: <t:{int(datetime.datetime.now(ZoneInfo('UTC')).timestamp())}:F>"
+                embed.fields[
+                    tmp_place - 1 if tmp_place <= 10 else 10
+                ].value += f"{user_str}: {points}\n"
             with Session(self.db) as session:
                 db_channel = session.get(models.Channel, channel_id)
                 if db_channel:
                     if db_channel.leaderboard_msg_id:
                         msg = await channel.fetch_message(db_channel.leaderboard_msg_id)
                         await msg.edit(
-                            content=leaderboard_str,
+                            content=None,
+                            embed=embed,
                             allowed_mentions=discord.AllowedMentions.none(),
                         )
                     else:
                         msg = await channel.send(
-                            content=leaderboard_str,
+                            embed=embed,
                             allowed_mentions=discord.AllowedMentions.none(),
                         )
                         await msg.pin()
