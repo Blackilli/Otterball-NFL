@@ -358,7 +358,7 @@ class MyClient(discord.Client):
                 channels[channel.id] = leaderboard
         for channel_id, leaderboard in channels.items():
             channel = await self.get_or_fetch_channel(channel_id)
-            leaderboard_str = "# Leaderboard:\n```"
+            leaderboard_str = "# Leaderboard:\n"
             tmp_place: int = 0
             tmp_points: int = 1e10
             for idx, (user_id, points) in enumerate(
@@ -372,7 +372,7 @@ class MyClient(discord.Client):
                 if channel_id == 1410581071220838521 and user_str == "Tephaine":
                     user_str = await channel.guild.fetch_emoji(1413678151661518950)
                 leaderboard_str += f"{tmp_place}. {user_str}: {points}\n"
-            leaderboard_str += "```"
+            leaderboard_str += ""
             leaderboard_str += f"\n-# Last update: <t:{int(datetime.datetime.now(ZoneInfo('UTC')).timestamp())}:F>"
             with Session(self.db) as session:
                 db_channel = session.get(models.Channel, channel_id)
