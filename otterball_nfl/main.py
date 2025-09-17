@@ -359,8 +359,8 @@ class MyClient(discord.Client):
         for channel_id, leaderboard in channels.items():
             channel = await self.get_or_fetch_channel(channel_id)
             embed = discord.Embed(
-                title="**Leaderboard**",
-                color=0x00FF00,
+                title="🏈 **Leaderboard** 🏈",
+                color=0x6434C9,
                 timestamp=datetime.datetime.now(ZoneInfo("UTC")),
             )
             tmp_place: int = 0
@@ -382,8 +382,12 @@ class MyClient(discord.Client):
                     + (f"{tmp_place}. " if tmp_place > 10 else "")
                     + f"{user_str}: {points}\n"
                 )
+            for i in range(1, 10):
+                if i not in leaderboard_strings:
+                    leaderboard_strings[i] = "---"
             for place, value in sorted(leaderboard_strings.items(), key=lambda x: x[0]):
-                value = value[:-2]
+                if value[-1] == "\n":
+                    value = value[:-1]
                 match place:
                     case 1:
                         embed.add_field(name="1st Place", value=value, inline=True)
