@@ -381,15 +381,20 @@ class MyClient(discord.Client):
                 field_idx = place if place <= 10 else 11
                 if field_idx in embed_field_values:
                     embed_field_values[field_idx] += "\n"
+                users_lines = []
+                for user in users:
+                    user_name = user.display_name
+                    if user_name == "Tephaine":
+                        emoji = await channel.guild.fetch_emoji(1413678151661518950)
+                        user_name = emoji
+                    users_lines.append(
+                        "> "
+                        + (f"{place}. " if place > 10 else "")
+                        + f"{user_name}: {score}"
+                    )
                 embed_field_values[field_idx] = embed_field_values.get(
                     field_idx, ""
-                ) + "\n".join(
-                    [
-                        (f"{place}. " if place > 10 else "")
-                        + f"{user.display_name}: {score}"
-                        for user in users
-                    ]
-                )
+                ) + "\n".join(users_lines)
                 place += len(user_ids)
 
             for i in range(1, 10):
@@ -399,7 +404,7 @@ class MyClient(discord.Client):
             for place, field_value in sorted(
                 embed_field_values.items(), key=lambda x: x[0]
             ):
-                field_value = f"```{field_value}```"
+                field_value = f"{field_value}"
                 match place:
                     case 1:
                         embed.add_field(
