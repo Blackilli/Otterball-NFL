@@ -388,9 +388,7 @@ class MyClient(discord.Client):
                         emoji = await channel.guild.fetch_emoji(1413678151661518950)
                         user_name = emoji
                     users_lines.append(
-                        "> "
-                        + (f"{place}. " if place > 10 else "")
-                        + f"{user_name}: {score}"
+                        (f"`{place}.` " if place > 10 else "") + f"{user_name}: {score}"
                     )
                 embed_field_values[field_idx] = embed_field_values.get(
                     field_idx, ""
@@ -399,7 +397,7 @@ class MyClient(discord.Client):
 
             for i in range(1, 10):
                 if i not in embed_field_values:
-                    embed_field_values[i] = "> ---"
+                    embed_field_values[i] = "---"
 
             for place, field_value in sorted(
                 embed_field_values.items(), key=lambda x: x[0]
