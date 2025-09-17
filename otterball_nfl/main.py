@@ -399,6 +399,7 @@ class MyClient(discord.Client):
             for place, field_value in sorted(
                 embed_field_values.items(), key=lambda x: x[0]
             ):
+                field_value = f"```{field_value}```"
                 match place:
                     case 1:
                         embed.add_field(
