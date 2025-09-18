@@ -169,8 +169,10 @@ class MyClient(discord.Client):
             stmt = (
                 select(models.Poll)
                 .join(models.Channel)
+                .join(models.Game)
                 .where(models.Channel.active == True)
                 .where(models.Poll.message_id == None)
+                .order_by(models.Game.kickoff)
             )
             for db_poll in session.scalars(stmt).all():
                 new_polls.append(db_poll)
