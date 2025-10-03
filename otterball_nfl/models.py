@@ -222,6 +222,28 @@ class Team(Base):
     )
 
 
+class StateMessageState(enum.Enum):
+    UNKNOWN = 0
+    STARTING_SOON = 1
+    IN_PROGRESS = 2
+    RESULT_POSTED = 3
+
+
+class StateMessage(Base):
+    __tablename__ = "state_message"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    poll_id: Mapped[int] = mapped_column(ForeignKey("poll.id"))
+    state: Mapped[StateMessageState] = mapped_column(
+        Enum(StateMessageState), default=StateMessageState.UNKNOWN
+    )
+
+    poll: Mapped[Poll] = relationship(
+        back_populates="state_message",
+        uselist=False,
+    )
+
+
 class Poll(Base):
     __tablename__ = "poll"
 
@@ -237,6 +259,10 @@ class Poll(Base):
     )
     game: Mapped[Game] = relationship(
         back_populates="polls",
+    )
+    state_message: Mapped[StateMessage] = relationship(
+        back_populates="poll",
+        uselist=False,
     )
 
     __table_args__ = (
