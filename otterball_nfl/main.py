@@ -126,6 +126,7 @@ class MyClient(discord.Client):
             stmt = (
                 select(models.Poll)
                 .join(models.Game)
+                .join(models.Channel)
                 .where(
                     models.Game.kickoff.between(
                         datetime.datetime.now(ZoneInfo("UTC")),
@@ -134,6 +135,7 @@ class MyClient(discord.Client):
                     )
                 )
                 .where(models.Poll.closed == False)
+                .where(models.Channel.active == True)
             )
             for db_poll in session.scalars(stmt).all():
                 db_poll: models.Poll
