@@ -72,6 +72,7 @@ class MyClient(discord.Client):
         self.create_new_polls.start()
         self.post_results.start()
         self.sync_bets.start()
+        self.sync_state_messages.start()
 
     async def sync_poll_bets(self, db_poll_id):
         with Session(self.db) as session:
@@ -117,6 +118,48 @@ class MyClient(discord.Client):
                 session.delete(deleted_bet)
 
             session.commit()
+
+    @tasks.loop(minutes=1)
+    async def sync_state_messages(self):
+        logger.info("Syncing state messages")
+        with Session(self.db) as session:
+            stmt = (
+                select(models.Poll)
+                .join(models.Game)
+                .join(models.StateMessage)
+                .where(
+                    models.Game.kickoff.between(
+                        datetime.datetime.now(ZoneInfo("UTC")),
+                        datetime.datetime.now(ZoneInfo("UTC"))
+                        + datetime.timedelta(days=2),
+                    )
+                )
+                .where(models.Poll.closed == True)
+                .where(models.Poll.state_message is None)
+            )
+            for db_poll in session.scalars(stmt).all():
+                db_poll: models.Poll
+                db_channel: models.Channel = db_poll.channel
+                channel = await self.get_or_fetch_channel(db_channel.id)
+                poll_message = await channel.fetch_message(db_poll.message_id)
+                poll = poll_message.poll
+                role = channel.guild.get_role(db_channel.role_id)
+
+                role_members: set[discord.Member] = set(role.members)
+                for answer in poll.answers:
+                    async for voter in answer.voters():
+                        for role_member in role_members:
+                            if role_member.id == voter.id:
+                                role_members.remove(role_member)
+                                break
+                logger.error(
+                    f"missing votes for {db_poll.message_id}: "
+                    + ", ".join([m.name for m in role_members])
+                )
+
+    @sync_state_messages.before_loop
+    async def before_sync_state_messages(self):
+        await self.wait_until_ready()
 
     @tasks.loop(minutes=5)
     async def sync_bets(self):
@@ -649,7 +692,6 @@ class MyClient(discord.Client):
         # await self.update_all_bets()
         print("LOL1")
         await self.post_leaderboards()
-        await self.upgrade_result_to_status()
 
     async def delete_message_by_link(self, message_link: str):
         channel_id, message_id = message_link.split("/")[-2:]
