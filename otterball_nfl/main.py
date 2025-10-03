@@ -144,6 +144,10 @@ class MyClient(discord.Client):
                 role = channel.guild.get_role(db_channel.role_id)
 
                 role_members: set[discord.Member] = set(role.members)
+                for member in role_members:
+                    if member.id == self.user.id:
+                        role_members.remove(member)
+                        break
                 for answer in poll.answers:
                     async for voter in answer.voters():
                         for role_member in role_members:
