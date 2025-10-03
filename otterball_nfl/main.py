@@ -126,7 +126,6 @@ class MyClient(discord.Client):
             stmt = (
                 select(models.Poll)
                 .join(models.Game)
-                .join(models.StateMessage)
                 .where(
                     models.Game.kickoff.between(
                         datetime.datetime.now(ZoneInfo("UTC")),
