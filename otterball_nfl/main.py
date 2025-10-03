@@ -52,10 +52,10 @@ class MyClient(discord.Client):
                 poll_messages.add(db_poll.message_id)
 
             for channel in channels:
-                async for message in channel.history():
+                async for message in channel.history(limit=None):
                     if (
-                        message.reference.message_id in poll_messages
-                        and message.type == discord.MessageType.reply
+                        message.type == discord.MessageType.reply
+                        and message.reference.message_id in poll_messages
                     ):
                         state_msg = session.get(models.StateMessage, message.id)
                         if not state_msg:
