@@ -134,7 +134,7 @@ class MyClient(discord.Client):
                         + datetime.timedelta(days=2),
                     )
                 )
-                .where(models.Poll.closed == True)
+                .where(models.Poll.closed == False)
                 .where(models.Poll.state_message is None)
             )
             for db_poll in session.scalars(stmt).all():
