@@ -36,7 +36,7 @@ class MyClient(discord.Client):
 
     async def upgrade_result_to_status(self):
         channels: set[discord.TextChannel] = set()
-        poll_messages: set[int] = set()
+        poll_messages: dict[int, int] = {}  # message_id: poll.id
 
         with Session(self.db) as session:
             stmt = select(models.Channel).where(models.Channel.active == True)
@@ -49,19 +49,19 @@ class MyClient(discord.Client):
                 .where(models.Poll.result_posted == True)
             )
             for db_poll in session.scalars(stmt).all():
-                poll_messages.add(db_poll.message_id)
+                poll_messages[db_poll.message_id] = db_poll.id
 
             for channel in channels:
                 async for message in channel.history(limit=None):
-                    if (
-                        message.type == discord.MessageType.reply
-                        and message.reference.message_id in poll_messages
-                    ):
+                    if message.type == discord.MessageType.reply:
+                        poll_id = poll_messages.get(message.reference.message_id)
+                        if poll_id is None:
+                            continue
                         state_msg = session.get(models.StateMessage, message.id)
                         if not state_msg:
                             state_msg = models.StateMessage(
                                 id=message.id,
-                                poll_id=message.reference.message_id,
+                                poll_id=poll_id,
                                 state=models.StateMessageState.RESULT_POSTED,
                             )
                             session.add(state_msg)
