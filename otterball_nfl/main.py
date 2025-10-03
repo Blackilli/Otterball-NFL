@@ -61,6 +61,7 @@ class MyClient(discord.Client):
                         if not state_msg:
                             state_msg = models.StateMessage(
                                 id=message.id,
+                                poll_id=message.reference.message_id,
                                 state=models.StateMessageState.RESULT_POSTED,
                             )
                             session.add(state_msg)
