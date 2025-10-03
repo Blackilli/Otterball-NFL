@@ -34,6 +34,38 @@ class MyClient(discord.Client):
         self.db = db_engine
         super().__init__(*args, **kwargs)
 
+    async def upgrade_result_to_status(self):
+        channels: set[discord.TextChannel] = set()
+        poll_messages: set[int] = set()
+
+        with Session(self.db) as session:
+            stmt = select(models.Channel).where(models.Channel.active == True)
+            for db_channel in session.scalars(stmt).all():
+                channels.add(await self.fetch_channel(db_channel.id))
+
+            stmt = (
+                select(models.Poll)
+                .where(models.Poll.message_id != None)
+                .where(models.Poll.result_posted == True)
+            )
+            for db_poll in session.scalars(stmt).all():
+                poll_messages.add(db_poll.message_id)
+
+            for channel in channels:
+                async for message in channel.history():
+                    if (
+                        message.reference.message_id in poll_messages
+                        and message.type == discord.MessageType.reply
+                    ):
+                        state_msg = session.get(models.StateMessage, message.id)
+                        if not state_msg:
+                            state_msg = models.StateMessage(
+                                id=message.id,
+                                state=models.StateMessageState.RESULT_POSTED,
+                            )
+                            session.add(state_msg)
+            session.commit()
+
     async def setup_hook(self) -> None:
         self.close_polls.start()
         self.create_new_polls.start()
@@ -616,6 +648,7 @@ class MyClient(discord.Client):
         # await self.update_all_bets()
         print("LOL1")
         await self.post_leaderboards()
+        await self.upgrade_result_to_status()
 
     async def delete_message_by_link(self, message_link: str):
         channel_id, message_id = message_link.split("/")[-2:]
