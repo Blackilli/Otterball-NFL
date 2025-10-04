@@ -192,13 +192,9 @@ class MyClient(discord.Client):
                 db_game: models.Game = db_poll.game
                 home_team: models.Team = db_game.home_team
                 away_team: models.Team = db_game.away_team
+                leading_team: models.Team = db_game.leading_team
                 home_emoji = await self.fetch_application_emoji(home_team.emoji_id)
                 away_emoji = await self.fetch_application_emoji(away_team.emoji_id)
-                leading_team: models.Team = (
-                    db_game.home_team
-                    if db_game.home_score >= db_game.away_score
-                    else db_game.away_team
-                )
                 text = (
                     f"# {home_emoji} {home_team.name} - {away_team.name} {away_emoji}"
                 )

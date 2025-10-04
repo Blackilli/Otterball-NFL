@@ -165,6 +165,14 @@ class Game(Base):
     )
 
     @property
+    def leading_team(self) -> Team:
+        if self.home_score >= self.away_score:
+            return self.home_team
+        elif self.home_score < self.away_score:
+            return self.away_team
+        return self.home_team
+
+    @property
     def winner(self) -> Team | None:
         if self.outcome == Outcome.HOME:
             return self.home_team
