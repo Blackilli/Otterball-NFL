@@ -715,7 +715,7 @@ class MyClient(discord.Client):
         # await self.update_all_bets()
         print("LOL1")
         await self.post_leaderboards()
-        await self.upgrade_result_to_status()
+        # await self.upgrade_result_to_status()
 
     async def delete_message_by_link(self, message_link: str):
         channel_id, message_id = message_link.split("/")[-2:]
