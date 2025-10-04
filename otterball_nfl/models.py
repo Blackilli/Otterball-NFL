@@ -233,7 +233,6 @@ class StateMessage(Base):
     __tablename__ = "state_message"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    poll_id: Mapped[int] = mapped_column(ForeignKey("poll.id"))
     state: Mapped[StateMessageState] = mapped_column(
         Enum(StateMessageState), default=StateMessageState.UNKNOWN
     )
@@ -250,6 +249,9 @@ class Poll(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     channel_id: Mapped[int] = mapped_column(ForeignKey("channel.id"))
     message_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    state_message_id: Mapped[int] = mapped_column(
+        ForeignKey("state_message.id"), nullable=True
+    )
     game_id: Mapped[str] = mapped_column(ForeignKey("game.id"))
     closed: Mapped[bool] = mapped_column(Boolean, default=False)
     result_posted: Mapped[bool] = mapped_column(Boolean, default=False)
