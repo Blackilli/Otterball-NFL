@@ -137,7 +137,7 @@ class MyClient(discord.Client):
                 )
                 .where(models.Poll.closed == False)
                 .where(models.Channel.active == True)
-                .where(models.Poll.message_id == None)
+                .where(models.Poll.state_message_id == None)
             )
             for db_poll in session.scalars(stmt).all():
                 db_poll: models.Poll
