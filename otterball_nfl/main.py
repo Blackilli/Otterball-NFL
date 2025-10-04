@@ -167,9 +167,30 @@ class MyClient(discord.Client):
                     f"# {home_emoji} {home_team.name} - {away_team.name} {away_emoji}"
                 )
                 text += f"\nReminder: Kickoff is <t:{int(db_game.kickoff.timestamp())}:R>. Last chance to get your votes in!"
-                text += f"\n-# Looking at you "
-                text += ", ".join([m.mention for m in role_members])
+                if len(role_members) > 0:
+                    text += f"\n-# Looking at you "
+                    text += ", ".join([m.mention for m in role_members])
+                if False:
+                    state_message = await poll_message.reply(
+                        content=text,
+                        allowed_mentions=discord.AllowedMentions(
+                            everyone=False, users=True, roles=False
+                        ),
+                    )
+                    db_state_message = models.StateMessage(
+                        id=state_message.id,
+                        state=models.StateMessageState.STARTING_SOON,
+                    )
+                    session.add(db_state_message)
+                    db_poll.state_message_id = db_state_message.id
+                    db_state_message = models.StateMessage(
+                        id=state_message.id,
+                        state=models.StateMessageState.STARTING_SOON,
+                    )
+                    session.add(db_state_message)
+                    db_poll.state_message_id = db_state_message.id
                 logger.error(text)
+            session.commit()
 
     async def state_message_in_progress(self):
         with Session(self.db) as session:
