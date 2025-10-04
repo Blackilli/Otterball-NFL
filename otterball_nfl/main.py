@@ -132,19 +132,20 @@ class MyClient(discord.Client):
                     models.Game.kickoff.between(
                         datetime.datetime.now(ZoneInfo("UTC")),
                         datetime.datetime.now(ZoneInfo("UTC"))
-                        + datetime.timedelta(days=2),
+                        + datetime.timedelta(days=1),
                     )
                 )
                 .where(models.Poll.closed == False)
                 .where(models.Channel.active == True)
+                .where(models.Poll.message_id == None)
             )
             for db_poll in session.scalars(stmt).all():
                 db_poll: models.Poll
                 db_channel: models.Channel = db_poll.channel
                 channel = await self.get_or_fetch_channel(db_channel.id)
                 poll_message = await channel.fetch_message(db_poll.message_id)
-                poll = poll_message.poll
-                role = channel.guild.get_role(db_channel.role_id)
+                poll: discord.Poll = poll_message.poll
+                role: discord.Role = channel.guild.get_role(db_channel.role_id)
 
                 role_members: set[discord.Member] = set(role.members)
                 for member in role_members:
@@ -157,10 +158,18 @@ class MyClient(discord.Client):
                             if role_member.id == voter.id:
                                 role_members.remove(role_member)
                                 break
-                logger.error(
-                    f"missing votes for {db_poll.message_id}: "
-                    + ", ".join([m.name for m in role_members])
+                db_game: models.Game = db_poll.game
+                home_team: models.Team = db_game.home_team
+                away_team: models.Team = db_game.away_team
+                home_emoji = await self.fetch_application_emoji(home_team.emoji_id)
+                away_emoji = await self.fetch_application_emoji(away_team.emoji_id)
+                text = (
+                    f"# {home_emoji} {home_team.name} - {away_team.name} {away_emoji}"
                 )
+                text += f"\n## Reminder: Kickoff is <t:{int(db_game.kickoff.timestamp())}:R>. Last chance to get your votes in!"
+                text += f"\n-# Looking at you "
+                text += ", ".join([m.mention for m in role_members])
+                logger.error(text)
 
     async def state_message_in_progress(self):
         with Session(self.db) as session:
