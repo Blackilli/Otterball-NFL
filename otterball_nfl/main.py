@@ -132,7 +132,7 @@ class MyClient(discord.Client):
                     models.Game.kickoff.between(
                         datetime.datetime.now(ZoneInfo("UTC")),
                         datetime.datetime.now(ZoneInfo("UTC"))
-                        + datetime.timedelta(days=1),
+                        + datetime.timedelta(hours=1),
                     )
                 )
                 .where(models.Poll.closed == False)
@@ -170,25 +170,24 @@ class MyClient(discord.Client):
                 if len(role_members) > 0:
                     text += f"\n-# Looking at you "
                     text += ", ".join([m.mention for m in role_members])
-                if False:
-                    state_message = await poll_message.reply(
-                        content=text,
-                        allowed_mentions=discord.AllowedMentions(
-                            everyone=False, users=True, roles=False
-                        ),
-                    )
-                    db_state_message = models.StateMessage(
-                        id=state_message.id,
-                        state=models.StateMessageState.STARTING_SOON,
-                    )
-                    session.add(db_state_message)
-                    db_poll.state_message_id = db_state_message.id
-                    db_state_message = models.StateMessage(
-                        id=state_message.id,
-                        state=models.StateMessageState.STARTING_SOON,
-                    )
-                    session.add(db_state_message)
-                    db_poll.state_message_id = db_state_message.id
+                state_message = await poll_message.reply(
+                    content=text,
+                    allowed_mentions=discord.AllowedMentions(
+                        everyone=False, users=True, roles=False
+                    ),
+                )
+                db_state_message = models.StateMessage(
+                    id=state_message.id,
+                    state=models.StateMessageState.STARTING_SOON,
+                )
+                session.add(db_state_message)
+                db_poll.state_message_id = db_state_message.id
+                db_state_message = models.StateMessage(
+                    id=state_message.id,
+                    state=models.StateMessageState.STARTING_SOON,
+                )
+                session.add(db_state_message)
+                db_poll.state_message_id = db_state_message.id
                 logger.error(text)
             session.commit()
 
