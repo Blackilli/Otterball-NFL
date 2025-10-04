@@ -47,6 +47,7 @@ class MyClient(discord.Client):
                 select(models.Poll)
                 .where(models.Poll.message_id != None)
                 .where(models.Poll.result_posted == True)
+                .where(models.Poll.state_message_id == None)
             )
             for db_poll in session.scalars(stmt).all():
                 poll_messages[db_poll.message_id] = db_poll.id
@@ -61,10 +62,12 @@ class MyClient(discord.Client):
                         if not state_msg:
                             state_msg = models.StateMessage(
                                 id=message.id,
-                                poll_id=poll_id,
                                 state=models.StateMessageState.RESULT_POSTED,
                             )
                             session.add(state_msg)
+                            db_poll = session.get(models.Poll, poll_id)
+                            db_poll.state_message_id = state_msg.id
+
             session.commit()
 
     async def setup_hook(self) -> None:
@@ -119,9 +122,7 @@ class MyClient(discord.Client):
 
             session.commit()
 
-    @tasks.loop(minutes=1)
-    async def sync_state_messages(self):
-        logger.info("Syncing state messages")
+    async def post_state_message_starting_soon(self):
         with Session(self.db) as session:
             stmt = (
                 select(models.Poll)
@@ -160,6 +161,24 @@ class MyClient(discord.Client):
                     f"missing votes for {db_poll.message_id}: "
                     + ", ".join([m.name for m in role_members])
                 )
+
+    async def state_message_in_progress(self):
+        with Session(self.db) as session:
+            stmt = (
+                select(models.StateMessage)
+                .join(models.Poll)
+                .join(models.Game)
+                .where(models.Game.kickoff <= datetime.datetime.now(ZoneInfo("UTC")))
+                .where(models.Game.outcome == models.Outcome.NOT_FINISHED)
+            )
+            for db_state_message in session.scalars(stmt).all():
+                pass
+        pass
+
+    @tasks.loop(minutes=1)
+    async def sync_state_messages(self):
+        logger.info("Syncing state messages")
+        await self.post_state_message_starting_soon()
 
     @sync_state_messages.before_loop
     async def before_sync_state_messages(self):
@@ -696,6 +715,7 @@ class MyClient(discord.Client):
         # await self.update_all_bets()
         print("LOL1")
         await self.post_leaderboards()
+        await self.upgrade_result_to_status()
 
     async def delete_message_by_link(self, message_link: str):
         channel_id, message_id = message_link.split("/")[-2:]
