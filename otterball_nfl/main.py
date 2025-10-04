@@ -166,7 +166,7 @@ class MyClient(discord.Client):
                 text = (
                     f"# {home_emoji} {home_team.name} - {away_team.name} {away_emoji}"
                 )
-                text += f"\n## Reminder: Kickoff is <t:{int(db_game.kickoff.timestamp())}:R>. Last chance to get your votes in!"
+                text += f"\nReminder: Kickoff is <t:{int(db_game.kickoff.timestamp())}:R>. Last chance to get your votes in!"
                 text += f"\n-# Looking at you "
                 text += ", ".join([m.mention for m in role_members])
                 logger.error(text)
@@ -174,15 +174,67 @@ class MyClient(discord.Client):
     async def state_message_in_progress(self):
         with Session(self.db) as session:
             stmt = (
-                select(models.StateMessage)
-                .join(models.Poll)
+                select(models.Poll)
                 .join(models.Game)
-                .where(models.Game.kickoff <= datetime.datetime.now(ZoneInfo("UTC")))
+                .where(
+                    models.Game.kickoff.between(
+                        datetime.datetime.now(ZoneInfo("UTC"))
+                        - datetime.timedelta(hours=12),
+                        datetime.datetime.now(ZoneInfo("UTC")),
+                    )
+                )
                 .where(models.Game.outcome == models.Outcome.NOT_FINISHED)
             )
-            for db_state_message in session.scalars(stmt).all():
-                pass
-        pass
+            for db_poll in session.scalars(stmt).all():
+                db_poll: models.Poll
+                channel = await self.get_or_fetch_channel(db_poll.channel_id)
+                db_state_message: models.StateMessage = db_poll.state_message
+                db_game: models.Game = db_poll.game
+                home_team: models.Team = db_game.home_team
+                away_team: models.Team = db_game.away_team
+                home_emoji = await self.fetch_application_emoji(home_team.emoji_id)
+                away_emoji = await self.fetch_application_emoji(away_team.emoji_id)
+                leading_team: models.Team = (
+                    db_game.home_team
+                    if db_game.home_score >= db_game.away_score
+                    else db_game.away_team
+                )
+                text = (
+                    f"# {home_emoji} {home_team.name} - {away_team.name} {away_emoji}"
+                )
+                embed = discord.Embed(
+                    title="Current Score",
+                    color=discord.Colour.from_str(leading_team.color),
+                    timestamp=datetime.datetime.now(ZoneInfo("UTC")),
+                )
+                embed.set_footer(text="Scores may take a few minutes to update")
+                embed.set_thumbnail(url=leading_team.logo)
+                embed.add_field(
+                    name=f"{home_team.name}",
+                    value=f"{db_game.home_score}",
+                    inline=True,
+                )
+                embed.add_field(
+                    name=f"{away_team.name}",
+                    value=f"{db_game.away_score}",
+                    inline=True,
+                )
+                if db_state_message:
+                    state_message = await channel.fetch_message(db_state_message.id)
+                    await state_message.edit(content=text, embed=embed)
+                    db_state_message.state = models.StateMessageState.IN_PROGRESS
+                else:
+                    state_message = await channel.send(
+                        content=text,
+                        embed=embed,
+                    )
+                    db_state_message = models.StateMessage(
+                        id=state_message.id,
+                        state=models.StateMessageState.IN_PROGRESS,
+                    )
+                    session.add(db_state_message)
+                    db_poll.state_message = db_state_message
+            session.commit()
 
     @tasks.loop(minutes=1)
     async def sync_state_messages(self):
