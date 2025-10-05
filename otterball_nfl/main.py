@@ -444,7 +444,7 @@ class MyClient(discord.Client):
                     )
                     home_team: models.Team = db_game.home_team
                     away_team: models.Team = db_game.away_team
-                    winner_team: models.Team = db_game.winner_team
+                    winner_team: models.Team = db_game.winner
                     home_team_emoji = await self.fetch_application_emoji(
                         home_team.emoji_id
                     )
