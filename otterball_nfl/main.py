@@ -224,7 +224,7 @@ class MyClient(discord.Client):
                     away_team_emoji = await self.fetch_application_emoji(
                         away_team.emoji_id
                     )
-                    text = f"# {home_team_emoji} {home_team.name} - {away_team.name} {away_team_emoji}"
+                    # text = f"# {home_team_emoji} {home_team.name} - {away_team.name} {away_team_emoji}"
                     embed = discord.Embed(
                         title="**Current Score**",
                         description=f"{db_game_type.name} ({db_scaling.factor} Otter Point{'' if db_scaling.factor == 1 else 's'})",
@@ -250,11 +250,11 @@ class MyClient(discord.Client):
                     )
                     if db_state_message:
                         state_message = await channel.fetch_message(db_state_message.id)
-                        await state_message.edit(content=text, embed=embed)
+                        await state_message.edit(content="", embed=embed)
                         db_state_message.state = models.StateMessageState.IN_PROGRESS
                     else:
                         state_message = await channel.send(
-                            content=text,
+                            content="",
                             embed=embed,
                         )
                         db_state_message = models.StateMessage(
