@@ -163,9 +163,7 @@ class MyClient(discord.Client):
                 away_team: models.Team = db_game.away_team
                 home_team_emoji = await self.fetch_application_emoji(home_team.emoji_id)
                 away_team_emoji = await self.fetch_application_emoji(away_team.emoji_id)
-                text = (
-                    f"# {home_team_emoji} {home_team.name} - {away_team.name} {away_team_emoji}"
-                )
+                text = f"# {home_team_emoji} {home_team.name} - {away_team.name} {away_team_emoji}"
                 text += f"\nReminder: Kickoff is <t:{int(db_game.kickoff.timestamp())}:R>. Last chance to get your votes in!"
                 if len(role_members) > 0:
                     text += f"\n-# Looking at you "
@@ -214,9 +212,7 @@ class MyClient(discord.Client):
                 leading_team: models.Team = db_game.leading_team
                 home_team_emoji = await self.fetch_application_emoji(home_team.emoji_id)
                 away_team_emoji = await self.fetch_application_emoji(away_team.emoji_id)
-                text = (
-                    f"# {home_team_emoji} {home_team.name} - {away_team.name} {away_team_emoji}"
-                )
+                text = f"# {home_team_emoji} {home_team.name} - {away_team.name} {away_team_emoji}"
                 embed = discord.Embed(
                     title="**Current Score**",
                     description=f"{db_game_type.name} ({db_scaling.factor} Otter Point{'' if db_scaling.factor == 1 else 's'})",
