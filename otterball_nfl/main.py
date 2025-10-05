@@ -217,7 +217,7 @@ class MyClient(discord.Client):
                     )
                     home_team: models.Team = db_game.home_team
                     away_team: models.Team = db_game.away_team
-                    leading_team: models.Team = db_game.leading_team
+                    leading_team: models.Team | None = db_game.leading_team
                     home_team_emoji = await self.fetch_application_emoji(
                         home_team.emoji_id
                     )
@@ -228,19 +228,24 @@ class MyClient(discord.Client):
                     embed = discord.Embed(
                         title="**Current Score**",
                         description=f"{db_game_type.name} ({db_scaling.factor} Otter Point{'' if db_scaling.factor == 1 else 's'})",
-                        color=discord.Colour.from_str(leading_team.color),
+                        color=(
+                            discord.Colour.from_str(leading_team.color)
+                            if leading_team
+                            else discord.Colour.blue()
+                        ),
                         timestamp=datetime.datetime.now(ZoneInfo("UTC")),
                     )
                     embed.set_footer(text="Scores may take a few minutes to update")
-                    embed.set_thumbnail(url=leading_team.logo)
+                    if leading_team:
+                        embed.set_thumbnail(url=leading_team.logo)
                     embed.add_field(
                         name=f"{home_team_emoji} {home_team.name}",
-                        value=f"{db_game.home_score}",
+                        value=f"{db_game.home_score or '?'}",
                         inline=True,
                     )
                     embed.add_field(
                         name=f"{away_team_emoji} {away_team.name}",
-                        value=f"{db_game.away_score}",
+                        value=f"{db_game.away_score or '?'}",
                         inline=True,
                     )
                     if db_state_message:
