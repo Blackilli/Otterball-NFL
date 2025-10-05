@@ -140,47 +140,54 @@ class MyClient(discord.Client):
                 .where(models.Poll.state_message_id == None)
             )
             for db_poll in session.scalars(stmt).all():
-                db_poll: models.Poll
-                db_channel: models.Channel = db_poll.channel
-                channel = await self.get_or_fetch_channel(db_channel.id)
-                poll_message = await channel.fetch_message(db_poll.message_id)
-                poll: discord.Poll = poll_message.poll
-                role: discord.Role = channel.guild.get_role(db_channel.role_id)
+                try:
+                    db_poll: models.Poll
+                    db_channel: models.Channel = db_poll.channel
+                    channel = await self.get_or_fetch_channel(db_channel.id)
+                    poll_message = await channel.fetch_message(db_poll.message_id)
+                    poll: discord.Poll = poll_message.poll
+                    role: discord.Role = channel.guild.get_role(db_channel.role_id)
 
-                role_members: set[discord.Member] = set(role.members)
-                for member in role_members:
-                    if member.id == self.user.id:
-                        role_members.remove(member)
-                        break
-                for answer in poll.answers:
-                    async for voter in answer.voters():
-                        for role_member in role_members:
-                            if role_member.id == voter.id:
-                                role_members.remove(role_member)
-                                break
-                db_game: models.Game = db_poll.game
-                home_team: models.Team = db_game.home_team
-                away_team: models.Team = db_game.away_team
-                home_team_emoji = await self.fetch_application_emoji(home_team.emoji_id)
-                away_team_emoji = await self.fetch_application_emoji(away_team.emoji_id)
-                text = f"# {home_team_emoji} {home_team.name} - {away_team.name} {away_team_emoji}"
-                text += f"\nReminder: Kickoff is <t:{int(db_game.kickoff.timestamp())}:R>. Last chance to get your votes in!"
-                if len(role_members) > 0:
-                    text += f"\n-# Looking at you "
-                    text += ", ".join([m.mention for m in role_members])
-                state_message = await poll_message.reply(
-                    content=text,
-                    allowed_mentions=discord.AllowedMentions(
-                        everyone=False, users=True, roles=False
-                    ),
-                )
-                db_state_message = models.StateMessage(
-                    id=state_message.id,
-                    state=models.StateMessageState.STARTING_SOON,
-                )
-                session.add(db_state_message)
-                db_poll.state_message_id = db_state_message.id
-                logger.error(text)
+                    role_members: set[discord.Member] = set(role.members)
+                    for member in role_members:
+                        if member.id == self.user.id:
+                            role_members.remove(member)
+                            break
+                    for answer in poll.answers:
+                        async for voter in answer.voters():
+                            for role_member in role_members:
+                                if role_member.id == voter.id:
+                                    role_members.remove(role_member)
+                                    break
+                    db_game: models.Game = db_poll.game
+                    home_team: models.Team = db_game.home_team
+                    away_team: models.Team = db_game.away_team
+                    home_team_emoji = await self.fetch_application_emoji(
+                        home_team.emoji_id
+                    )
+                    away_team_emoji = await self.fetch_application_emoji(
+                        away_team.emoji_id
+                    )
+                    text = f"# {home_team_emoji} {home_team.name} - {away_team.name} {away_team_emoji}"
+                    text += f"\nReminder: Kickoff is <t:{int(db_game.kickoff.timestamp())}:R>. Last chance to get your votes in!"
+                    if len(role_members) > 0:
+                        text += f"\n-# Looking at you "
+                        text += ", ".join([m.mention for m in role_members])
+                    state_message = await poll_message.reply(
+                        content=text,
+                        allowed_mentions=discord.AllowedMentions(
+                            everyone=False, users=True, roles=False
+                        ),
+                    )
+                    db_state_message = models.StateMessage(
+                        id=state_message.id,
+                        state=models.StateMessageState.STARTING_SOON,
+                    )
+                    session.add(db_state_message)
+                    db_poll.state_message_id = db_state_message.id
+                    logger.error(text)
+                except Exception as e:
+                    logger.error(e)
             session.commit()
 
     async def state_message_in_progress(self):
@@ -198,54 +205,61 @@ class MyClient(discord.Client):
                 .where(models.Game.outcome == models.Outcome.NOT_FINISHED)
             )
             for db_poll in session.scalars(stmt).all():
-                db_poll: models.Poll
-                channel = await self.get_or_fetch_channel(db_poll.channel_id)
-                db_state_message: models.StateMessage = db_poll.state_message
-                db_game: models.Game = db_poll.game
-                db_game_type: models.GameType = db_game.gametype
-                db_scaling: models.GameTypeScaling | None = session.get(
-                    entity=models.GameTypeScaling,
-                    ident=(db_poll.channel_id, db_game.gametype_id),
-                )
-                home_team: models.Team = db_game.home_team
-                away_team: models.Team = db_game.away_team
-                leading_team: models.Team = db_game.leading_team
-                home_team_emoji = await self.fetch_application_emoji(home_team.emoji_id)
-                away_team_emoji = await self.fetch_application_emoji(away_team.emoji_id)
-                text = f"# {home_team_emoji} {home_team.name} - {away_team.name} {away_team_emoji}"
-                embed = discord.Embed(
-                    title="**Current Score**",
-                    description=f"{db_game_type.name} ({db_scaling.factor} Otter Point{'' if db_scaling.factor == 1 else 's'})",
-                    color=discord.Colour.from_str(leading_team.color),
-                    timestamp=datetime.datetime.now(ZoneInfo("UTC")),
-                )
-                embed.set_footer(text="Scores may take a few minutes to update")
-                embed.set_thumbnail(url=leading_team.logo)
-                embed.add_field(
-                    name=f"{home_team_emoji} {home_team.name}",
-                    value=f"{db_game.home_score}",
-                    inline=True,
-                )
-                embed.add_field(
-                    name=f"{away_team_emoji} {away_team.name}",
-                    value=f"{db_game.away_score}",
-                    inline=True,
-                )
-                if db_state_message:
-                    state_message = await channel.fetch_message(db_state_message.id)
-                    await state_message.edit(content=text, embed=embed)
-                    db_state_message.state = models.StateMessageState.IN_PROGRESS
-                else:
-                    state_message = await channel.send(
-                        content=text,
-                        embed=embed,
+                try:
+                    db_poll: models.Poll
+                    channel = await self.get_or_fetch_channel(db_poll.channel_id)
+                    db_state_message: models.StateMessage = db_poll.state_message
+                    db_game: models.Game = db_poll.game
+                    db_game_type: models.GameType = db_game.gametype
+                    db_scaling: models.GameTypeScaling | None = session.get(
+                        entity=models.GameTypeScaling,
+                        ident=(db_poll.channel_id, db_game.gametype_id),
                     )
-                    db_state_message = models.StateMessage(
-                        id=state_message.id,
-                        state=models.StateMessageState.IN_PROGRESS,
+                    home_team: models.Team = db_game.home_team
+                    away_team: models.Team = db_game.away_team
+                    leading_team: models.Team = db_game.leading_team
+                    home_team_emoji = await self.fetch_application_emoji(
+                        home_team.emoji_id
                     )
-                    session.add(db_state_message)
-                    db_poll.state_message = db_state_message
+                    away_team_emoji = await self.fetch_application_emoji(
+                        away_team.emoji_id
+                    )
+                    text = f"# {home_team_emoji} {home_team.name} - {away_team.name} {away_team_emoji}"
+                    embed = discord.Embed(
+                        title="**Current Score**",
+                        description=f"{db_game_type.name} ({db_scaling.factor} Otter Point{'' if db_scaling.factor == 1 else 's'})",
+                        color=discord.Colour.from_str(leading_team.color),
+                        timestamp=datetime.datetime.now(ZoneInfo("UTC")),
+                    )
+                    embed.set_footer(text="Scores may take a few minutes to update")
+                    embed.set_thumbnail(url=leading_team.logo)
+                    embed.add_field(
+                        name=f"{home_team_emoji} {home_team.name}",
+                        value=f"{db_game.home_score}",
+                        inline=True,
+                    )
+                    embed.add_field(
+                        name=f"{away_team_emoji} {away_team.name}",
+                        value=f"{db_game.away_score}",
+                        inline=True,
+                    )
+                    if db_state_message:
+                        state_message = await channel.fetch_message(db_state_message.id)
+                        await state_message.edit(content=text, embed=embed)
+                        db_state_message.state = models.StateMessageState.IN_PROGRESS
+                    else:
+                        state_message = await channel.send(
+                            content=text,
+                            embed=embed,
+                        )
+                        db_state_message = models.StateMessage(
+                            id=state_message.id,
+                            state=models.StateMessageState.IN_PROGRESS,
+                        )
+                        session.add(db_state_message)
+                        db_poll.state_message = db_state_message
+                except Exception as e:
+                    logger.error(e)
             session.commit()
 
     @tasks.loop(minutes=1)
