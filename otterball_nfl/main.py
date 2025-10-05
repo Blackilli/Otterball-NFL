@@ -508,6 +508,7 @@ class MyClient(discord.Client):
                     if db_state_message:
                         state_message = await channel.fetch_message(db_state_message.id)
                         await state_message.edit(
+                            content="",
                             embed=embed,
                             allowed_mentions=discord.AllowedMentions(users=True),
                         )
