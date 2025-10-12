@@ -28,7 +28,7 @@ logger.setLevel(settings.LOG_LEVEL)
 
 class MyClient(discord.Client):
     db: sqlalchemy.engine.Engine
-    emojis: dict[int, discord.Emoji]
+    emoji_cache: dict[int, discord.Emoji] = dict()
 
     def __init__(self, db_engine: sqlalchemy.engine.Engine, *args, **kwargs):
         self.db = db_engine
@@ -275,17 +275,17 @@ class MyClient(discord.Client):
         await self.wait_until_ready()
 
     async def get_or_fetch_emoji(self, emoji_id: int) -> discord.Emoji:
-        if emoji_id in self.emojis:
-            return self.emojis[emoji_id]
+        if emoji_id in self.emoji_cache:
+            return self.emoji_cache[emoji_id]
         else:
             emoji = await self.fetch_application_emoji(emoji_id)
-            self.emojis[emoji_id] = emoji
+            self.emoji_cache[emoji_id] = emoji
             return emoji
 
     @tasks.loop(minutes=60)
     async def precache_emojis(self):
         for emoji in await self.fetch_application_emojis():
-            self.emojis[emoji.id] = emoji
+            self.emoji_cache[emoji.id] = emoji
 
     @precache_emojis.before_loop
     async def before_precache_emojis(self):
