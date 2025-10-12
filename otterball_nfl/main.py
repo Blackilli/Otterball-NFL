@@ -536,14 +536,20 @@ class MyClient(discord.Client):
                     )
                     if db_state_message:
                         state_message = await channel.fetch_message(db_state_message.id)
-                        await state_message.edit(
-                            content="",
-                            embed=embed,
-                            allowed_mentions=discord.AllowedMentions(users=True),
-                        )
+                        if len(state_message.content) > 0:
+                            await state_message.edit(
+                                content="",
+                                embed=embed,
+                                allowed_mentions=discord.AllowedMentions(users=True),
+                            )
+                        else:
+                            await state_message.edit(
+                                embed=embed,
+                                allowed_mentions=discord.AllowedMentions(users=True),
+                            )
                         db_state_message.state = models.StateMessageState.RESULT_POSTED
                     else:
-                        state_message = await channel.send(
+                        state_message = await poll_msg.reply(
                             embed=embed,
                             allowed_mentions=discord.AllowedMentions(users=True),
                         )
