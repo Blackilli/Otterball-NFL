@@ -247,13 +247,13 @@ class MyClient(discord.Client):
                     )
                     if db_state_message:
                         state_message = await channel.fetch_message(db_state_message.id)
-                        await state_message.edit(content="", embed=embed)
+                        if len(state_message.content) > 0:
+                            await state_message.edit(content="", embed=embed)
+                        else:
+                            await state_message.edit(embed=embed)
                         db_state_message.state = models.StateMessageState.IN_PROGRESS
                     else:
-                        state_message = await channel.send(
-                            content="",
-                            embed=embed,
-                        )
+                        state_message = await channel.send(embed=embed)
                         db_state_message = models.StateMessage(
                             id=state_message.id,
                             state=models.StateMessageState.IN_PROGRESS,
