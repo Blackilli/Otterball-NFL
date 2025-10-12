@@ -264,7 +264,7 @@ class MyClient(discord.Client):
                     logger.error(e)
             session.commit()
 
-    @tasks.loop(minutes=1)
+    @tasks.loop(minutes=5)
     async def sync_state_messages(self):
         logger.info("Syncing state messages")
         await self.post_state_message_starting_soon()
