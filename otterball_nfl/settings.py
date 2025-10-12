@@ -1,3 +1,4 @@
+import logging
 from os import environ
 
 DISCORD_BOT_TOKEN = environ.get("DISCORD_BOT_TOKEN")
@@ -16,3 +17,17 @@ RABBITMQ_PASS = environ.get("RABBITMQ_DEFAULT_PASS")
 RABBITMQ_VHOST = environ.get("RABBITMQ_DEFAULT_VHOST", "my_vhost")
 RABBITMQ_PORT = environ.get("RABBITMQ_NODE_PORT", 5672)
 CELERY_BROKER_URL = f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASS}@{RABBITMQ_HOSTNAME}:{RABBITMQ_PORT}/{RABBITMQ_VHOST}"
+
+match environ.get("LOG_LEVEL", "INFO"):
+    case "DEBUG":
+        LOG_LEVEL = logging.DEBUG
+    case "INFO":
+        LOG_LEVEL = logging.INFO
+    case "WARNING":
+        LOG_LEVEL = logging.WARNING
+    case "ERROR":
+        LOG_LEVEL = logging.ERROR
+    case "CRITICAL":
+        LOG_LEVEL = logging.CRITICAL
+    case _:
+        LOG_LEVEL = logging.INFO

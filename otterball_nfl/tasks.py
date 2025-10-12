@@ -13,6 +13,7 @@ from otterball_nfl import settings, models
 from otterball_nfl.models import Game
 
 logger = get_task_logger(__name__)
+logger.setLevel(settings.LOG_LEVEL)
 
 engine = create_engine(settings.DB_CONNECTION_STRING, echo=False)
 

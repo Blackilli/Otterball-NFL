@@ -1,12 +1,11 @@
-import asyncio
 import datetime
-
 import logging
-import traceback
 from zoneinfo import ZoneInfo
 
+import settings
+
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    level=settings.LOG_LEVEL, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 
 import discord
@@ -21,10 +20,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import models
-import settings
 from sqlalchemy import create_engine
 
 logger = logging.getLogger("mybot")
+logger.setLevel(settings.LOG_LEVEL)
 
 
 class MyClient(discord.Client):

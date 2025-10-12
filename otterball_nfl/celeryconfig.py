@@ -11,8 +11,6 @@ timezone = "Europe/Berlin"
 enable_utc = True
 database_create_tables_at_setup = True
 
-from celery.schedules import crontab
-
 beat_schedule = {
     "update-games-every-five-minutes": {
         "task": "otterball_nfl.tasks.update_games",
