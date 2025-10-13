@@ -28,7 +28,6 @@ logger.setLevel(settings.LOG_LEVEL)
 
 class MyClient(discord.Client):
     db: sqlalchemy.engine.Engine
-    emoji_cache: dict[int, discord.Emoji] = dict()
 
     def __init__(self, db_engine: sqlalchemy.engine.Engine, *args, **kwargs):
         self.db = db_engine
@@ -219,8 +218,6 @@ class MyClient(discord.Client):
                     home_team: models.Team = db_game.home_team
                     away_team: models.Team = db_game.away_team
                     leading_team: models.Team | None = db_game.leading_team
-                    home_team_emoji = await self.get_or_fetch_emoji(home_team.emoji_id)
-                    away_team_emoji = await self.get_or_fetch_emoji(away_team.emoji_id)
                     # text = f"# {home_team_emoji} {home_team.name} - {away_team.name} {away_team_emoji}"
                     embed = discord.Embed(
                         title="**Current Score**",
@@ -236,12 +233,12 @@ class MyClient(discord.Client):
                     if leading_team:
                         embed.set_thumbnail(url=leading_team.logo)
                     embed.add_field(
-                        name=f"{home_team_emoji} {home_team.name}",
+                        name=f"{home_team.emoji_str} {home_team.name}",
                         value=f"{db_game.home_score or '?'}",
                         inline=True,
                     )
                     embed.add_field(
-                        name=f"{away_team_emoji} {away_team.name}",
+                        name=f"{away_team.emoji_str} {away_team.name}",
                         value=f"{db_game.away_score or '?'}",
                         inline=True,
                     )
@@ -274,18 +271,15 @@ class MyClient(discord.Client):
     async def before_sync_state_messages(self):
         await self.wait_until_ready()
 
-    async def get_or_fetch_emoji(self, emoji_id: int) -> discord.Emoji:
-        if emoji_id in self.emoji_cache:
-            return self.emoji_cache[emoji_id]
-        else:
-            emoji = await self.fetch_application_emoji(emoji_id)
-            self.emoji_cache[emoji_id] = emoji
-            return emoji
-
     @tasks.loop(minutes=60)
     async def precache_emojis(self):
-        for emoji in await self.fetch_application_emojis():
-            self.emoji_cache[emoji.id] = emoji
+        with Session(self.db) as session:
+            stmt = select(models.Team).where(models.Team.emoji_id != None)
+            for db_team in session.scalars(stmt).all():
+                db_team.emoji_str = str(
+                    await self.fetch_application_emoji(db_team.emoji_id)
+                )
+            session.commit()
 
     @precache_emojis.before_loop
     async def before_precache_emojis(self):
@@ -322,8 +316,6 @@ class MyClient(discord.Client):
             away_team: models.Team | None = session.get(
                 models.Team, db_game.away_team_id
             )
-            home_emoji = await self.get_or_fetch_emoji(home_team.emoji_id)
-            away_emoji = await self.get_or_fetch_emoji(away_team.emoji_id)
 
             channel = await self.get_or_fetch_channel(db_channel.id)
             poll = discord.Poll(
@@ -336,15 +328,13 @@ class MyClient(discord.Client):
             )
             for answer in sorted(models.Outcome):
                 if answer == models.Outcome.HOME:
-                    poll.add_answer(text=home_team.name, emoji=home_emoji)
+                    poll.add_answer(text=home_team.name, emoji=home_team.emoji_str)
                 elif answer == models.Outcome.AWAY:
-                    poll.add_answer(text=away_team.name, emoji=away_emoji)
+                    poll.add_answer(text=away_team.name, emoji=away_team.emoji_str)
                 elif answer == models.Outcome.TIE and db_game.gametype_id == "REG":
                     poll.add_answer(text="Tie", emoji="🤝")
             try:
-                content = (
-                    f"# {home_emoji} {home_team.name} - {away_team.name} {away_emoji}"
-                )
+                content = f"# {home_team.emoji_str} {home_team.name} - {away_team.name} {home_team.emoji_str}"
                 content += f"\n### 🏈   {db_game.gametype.name}"
                 db_scaling = session.get(
                     models.GameTypeScaling, (db_channel.id, db_game.gametype_id)
@@ -478,8 +468,6 @@ class MyClient(discord.Client):
                     home_team: models.Team = db_game.home_team
                     away_team: models.Team = db_game.away_team
                     winner_team: models.Team = db_game.winner
-                    home_team_emoji = await self.get_or_fetch_emoji(home_team.emoji_id)
-                    away_team_emoji = await self.get_or_fetch_emoji(away_team.emoji_id)
 
                     embed = discord.Embed(
                         title="**Final Score**",
@@ -493,12 +481,12 @@ class MyClient(discord.Client):
                         timestamp=datetime.datetime.now(ZoneInfo("UTC")),
                     )
                     embed.add_field(
-                        name=f"{home_team_emoji} {home_team.name}",
+                        name=f"{home_team.emoji_str} {home_team.name}",
                         value=db_game.home_score,
                         inline=True,
                     )
                     embed.add_field(
-                        name=f"{away_team_emoji} {away_team.name}",
+                        name=f"{away_team.emoji_str} {away_team.name}",
                         value=db_game.away_score,
                         inline=True,
                     )

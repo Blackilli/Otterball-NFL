@@ -214,6 +214,7 @@ class Team(Base):
     name: Mapped[str] = mapped_column(String, unique=False)
     logo: Mapped[str] = mapped_column(String)
     emoji_id: Mapped[int] = mapped_column(BigInteger)
+    emoji_str: Mapped[str] = mapped_column(String, nullable=True)
     color: Mapped[str] = mapped_column(String, nullable=True)
 
     games: Mapped[list[Game]] = relationship(
