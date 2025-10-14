@@ -121,6 +121,7 @@ def update_espn_teams(*args, **kwargs):
         teams = response.json()["sports"][0]["leagues"][0]["teams"]
         with Session(engine) as session:
             for team in teams:
+                team = team["team"]
                 db_team = session.get(models.Team, str(team["abbreviation"]).upper())
                 if not db_team:
                     logger.error(f"Team {team['abbreviation']} not found")
