@@ -135,21 +135,26 @@ def update_espn_teams(*args, **kwargs):
         with Session(engine) as session:
             for team in teams:
                 team = team["team"]
-                db_team = session.get(models.Team, str(team["abbreviation"]).upper())
-                if not db_team:
-                    logger.error(f"Team {team['abbreviation']} not found")
-                    continue
                 stmt = (
                     select(models.TeamIdentifier)
                     .where(models.TeamIdentifier.external_id == str(team["id"]))
                     .where(models.TeamIdentifier.source == models.ApiSource.ESPN_V2)
                 )
-                if session.scalars(stmt).first() is None:
-                    session.add(
-                        models.TeamIdentifier(
-                            team_id=db_team.id,
-                            external_id=str(team["id"]),
-                            source=models.ApiSource.ESPN_V2,
-                        )
+                if session.scalars(stmt).first():
+                    continue
+
+                db_team = session.get(models.Team, str(team["abbreviation"]).upper())
+                if db_team is None:
+                    logger.error(
+                        f"Team {team["name"]} ({team['abbreviation']}) not found"
                     )
+                    continue
+
+                session.add(
+                    models.TeamIdentifier(
+                        team_id=db_team.id,
+                        external_id=str(team["id"]),
+                        source=models.ApiSource.ESPN_V2,
+                    )
+                )
             session.commit()
