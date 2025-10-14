@@ -168,6 +168,11 @@ class Game(Base):
     gametype: Mapped[GameType] = relationship(
         back_populates="games",
     )
+    identifiers: Mapped[list[GameIdentifier]] = relationship(
+        "GameIdentifier",
+        back_populates="game",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def leading_team(self) -> Team | None:
@@ -210,6 +215,24 @@ class Game(Base):
         elif self.outcome == Outcome.AWAY:
             return self.home_score
         return None
+
+
+class GameIdentifier(Base):
+    __tablename__ = "game_identifier"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    game_id: Mapped[str] = mapped_column(ForeignKey("game.id"), nullable=False)
+    source: Mapped[ApiSource] = mapped_column(Enum(ApiSource), nullable=False)
+    external_id: Mapped[str] = mapped_column(String, nullable=False)
+
+    game: Mapped[Game] = relationship(
+        Game,
+        back_populates="identifiers",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("source", "external_id", name="uq_game_source_external_id"),
+    )
 
 
 class Team(Base):
@@ -257,7 +280,7 @@ class TeamIdentifier(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("source", "external_id", name="uq_source_external_id"),
+        UniqueConstraint("source", "external_id", name="uq_team_source_external_id"),
     )
 
 

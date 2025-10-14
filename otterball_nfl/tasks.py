@@ -63,6 +63,19 @@ def update_games(self: Task, season: int):
                     )
                     db_game.outcome = models.Outcome.from_result(db_game.result)
                     session.add(db_game)
+                stmt = (
+                    select(models.GameIdentifier)
+                    .where(models.GameIdentifier.source == models.ApiSource.NFL_DATA_PY)
+                    .where(models.GameIdentifier.external_id == str(game.game_id))
+                )
+                if session.scalars(stmt).first() is None:
+                    session.add(
+                        models.GameIdentifier(
+                            game_id=db_game.id,
+                            external_id=str(game.game_id),
+                            source=models.ApiSource.NFL_DATA_PY,
+                        )
+                    )
             except Exception as e:
                 print(e)
                 continue
