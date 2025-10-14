@@ -764,14 +764,14 @@ class MyClient(discord.Client):
                 session.add(db_team)
             stmt = (
                 select(models.TeamIdentifier)
-                .where(models.TeamIdentifier.external_id == team.team_id)
+                .where(models.TeamIdentifier.external_id == str(team.team_id))
                 .where(models.TeamIdentifier.source == models.ApiSource.NFL_DATA_PY)
             )
             if session.scalars(stmt).first() is None:
                 session.add(
                     models.TeamIdentifier(
                         team_id=db_team.id,
-                        external_id=team.team_id,
+                        external_id=str(team.team_id),
                         source=models.ApiSource.NFL_DATA_PY,
                     )
                 )
