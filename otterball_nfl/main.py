@@ -737,41 +737,56 @@ class MyClient(discord.Client):
         await self.populate_game_type_scaling()
         await self.populate_all_teams()
 
-    async def populate_team(self, team: pd.Series, emoji_id: int = 0):
-        if emoji_id == 0:
+    async def populate_team(self, team: pd.Series, emoji: discord.Emoji | None = None):
+        if emoji is None:
             response = httpx.get(team.team_logo_wikipedia, follow_redirects=True)
             image = response.content
             emoji = await self.create_application_emoji(
                 name=team.team_abbr, image=image
             )
-            emoji_id = emoji.id
         with Session(self.db) as session:
             db_team: models.Team | None = session.get(models.Team, team.team_abbr)
             if db_team:
                 db_team.name = team.team_name
                 db_team.logo = team.team_logo_wikipedia
-                db_team.emoji_id = emoji_id
+                db_team.emoji_id = emoji.id
+                db_team.emoji_str = str(emoji)
                 db_team.color = team.team_color
             else:
                 db_team = models.Team(
                     id=team.team_abbr,
                     name=team.team_name,
                     logo=team.team_logo_wikipedia,
-                    emoji_id=emoji_id,
+                    emoji_id=emoji.id,
+                    emoji_str=str(emoji),
                     color=team.team_color,
                 )
                 session.add(db_team)
+            stmt = (
+                select(models.TeamIdentifier)
+                .where(models.TeamIdentifier.external_id == team.team_id)
+                .where(models.TeamIdentifier.source == models.ApiSource.NFL_DATA_PY)
+            )
+            if session.scalars(stmt).first() is None:
+                session.add(
+                    models.TeamIdentifier(
+                        team_id=db_team.id,
+                        external_id=team.team_id,
+                        source=models.ApiSource.NFL_DATA_PY,
+                    )
+                )
             session.commit()
 
     async def populate_all_teams(self):
         emojis = await self.fetch_application_emojis()
 
         for team in nfl.import_team_desc().iloc:
-            emoji_id = 0
+            team_emoji = None
             for emoji in emojis:
                 if emoji.name == team.team_abbr:
-                    emoji_id = emoji.id
-            await self.populate_team(team, emoji_id)
+                    team_emoji = emoji
+                    break
+            await self.populate_team(team, emoji=team_emoji)
 
     async def populate_game_types(self):
         game_types = [
