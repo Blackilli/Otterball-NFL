@@ -3,7 +3,8 @@ from zoneinfo import ZoneInfo
 
 import nfl_data_py as nfl
 import pandas as pd
-from celery import Celery, Task
+import httpx
+from celery import Celery, Task, signals
 from celery.utils.log import get_task_logger
 from numpy import isnan
 from sqlalchemy import create_engine, select
@@ -109,3 +110,32 @@ def create_polls(self: Task):
                     )
                 )
         session.commit()
+
+
+@signals.worker_ready.connect
+def update_espn_teams(*args, **kwargs):
+    with httpx.Client() as client:
+        response = client.get(
+            "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams"
+        )
+        teams = response.json()["sports"][0]["leagues"][0]["teams"]
+        with Session(engine) as session:
+            for team in teams:
+                db_team = session.get(models.Team, str(team["abbreviation"]).upper())
+                if not db_team:
+                    logger.error(f"Team {team['abbreviation']} not found")
+                    continue
+                stmt = (
+                    select(models.TeamIdentifier)
+                    .where(models.TeamIdentifier.external_id == str(team["id"]))
+                    .where(models.TeamIdentifier.source == models.ApiSource.ESPN_V2)
+                )
+                if session.scalars(stmt).first() is None:
+                    session.add(
+                        models.TeamIdentifier(
+                            team_id=db_team.id,
+                            external_id=str(team["id"]),
+                            source=models.ApiSource.ESPN_V2,
+                        )
+                    )
+            session.commit()
