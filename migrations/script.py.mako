@@ -9,6 +9,8 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+import sqlalchemy.dialects.postgresql.named_types as pg_types
+from migrations.utils import check_enum_exists
 ${imports if imports else ""}
 
 # revision identifiers, used by Alembic.

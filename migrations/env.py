@@ -2,6 +2,7 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy import types
 
 from celery.backends.database.session import ResultModelBase
 
@@ -55,6 +56,13 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def render_item(type_, obj, autogen_context):
+    if isinstance(obj, types.Enum):
+        values = [repr(value) for value in obj.enums]
+        return f"pg_types.ENUM({', '.join(values)}, name='{obj.name}', create_type=not check_enum_exists(op, '{obj.name}'))"
+    return False
+
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
@@ -69,7 +77,11 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            render_item=render_item,
+        )
 
         with context.begin_transaction():
             context.run_migrations()
