@@ -31,6 +31,18 @@ class Base(DeclarativeBase):
     pass
 
 
+class ApiSource(enum.Enum):
+    NFL_DATA_PY = "nfl_data_py"
+    ESPN_V2 = "espn_com_v2"
+
+
+class StateMessageState(enum.Enum):
+    UNKNOWN = 0
+    STARTING_SOON = 1
+    IN_PROGRESS = 2
+    RESULT_POSTED = 3
+
+
 class Channel(Base):
     __tablename__ = "channel"
 
@@ -79,13 +91,6 @@ class User(Base):
 
     def __repr__(self):
         return f"<User(id={self.id}, username={self.username})>"
-
-
-# class GameType(enum.StrEnum):
-#     REGULAR = "REG"
-#     DIV = "DIV"
-#     CONFERENCE = "CON"
-#     SUPERBOWL = "SB"
 
 
 class GameType(Base):
@@ -231,13 +236,29 @@ class Team(Base):
         cascade="all, delete-orphan",
         primaryjoin=and_(id == Game.away_team_id, id != Game.home_team_id),
     )
+    identifiers: Mapped[list[TeamIdentifier]] = relationship(
+        "TeamIdentifier",
+        back_populates="team",
+        cascade="all, delete-orphan",
+    )
 
 
-class StateMessageState(enum.Enum):
-    UNKNOWN = 0
-    STARTING_SOON = 1
-    IN_PROGRESS = 2
-    RESULT_POSTED = 3
+class TeamIdentifier(Base):
+    __tablename__ = "team_identifier"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    team_id: Mapped[str] = mapped_column(ForeignKey("team.id"), nullable=False)
+    source: Mapped[ApiSource] = mapped_column(Enum(ApiSource), nullable=False)
+    external_id: Mapped[str] = mapped_column(String, nullable=False)
+
+    team: Mapped[Team] = relationship(
+        Team,
+        back_populates="identifiers",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("source", "external_id", name="uq_source_external_id"),
+    )
 
 
 class StateMessage(Base):
