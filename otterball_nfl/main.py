@@ -334,7 +334,7 @@ class MyClient(discord.Client):
                 elif answer == models.Outcome.TIE and db_game.gametype_id == "REG":
                     poll.add_answer(text="Tie", emoji="🤝")
             try:
-                content = f"# {home_team.emoji_str} {home_team.name} - {away_team.name} {home_team.emoji_str}"
+                content = f"# {home_team.emoji_str} {home_team.name} - {away_team.name} {away_team.emoji_str}"
                 content += f"\n### 🏈   {db_game.gametype.name}"
                 db_scaling = session.get(
                     models.GameTypeScaling, (db_channel.id, db_game.gametype_id)
