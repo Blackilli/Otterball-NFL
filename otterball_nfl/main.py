@@ -866,7 +866,7 @@ class MyClient(discord.Client):
                 print(f"{guild.name}: {channel} ({channel.id})")
         # await self.update_all_bets()
         print("LOL1")
-        await self.fix_poll_message_header()
+        # await self.fix_poll_message_header()
         await self.post_leaderboards()
         # await self.upgrade_result_to_status()
 
