@@ -175,6 +175,10 @@ class Game(Base):
     )
 
     @property
+    def message_title(self) -> str:
+        return f"{self.home_team.emoji_str} {self.home_team.name} - {self.away_team.name} {self.away_team.emoji_str}"
+
+    @property
     def leading_team(self) -> Team | None:
         if self.home_score is None or self.away_score is None:
             return None

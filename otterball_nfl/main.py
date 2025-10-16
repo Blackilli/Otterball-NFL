@@ -160,15 +160,7 @@ class MyClient(discord.Client):
                                     role_members.remove(role_member)
                                     break
                     db_game: models.Game = db_poll.game
-                    home_team: models.Team = db_game.home_team
-                    away_team: models.Team = db_game.away_team
-                    home_team_emoji = await self.fetch_application_emoji(
-                        home_team.emoji_id
-                    )
-                    away_team_emoji = await self.fetch_application_emoji(
-                        away_team.emoji_id
-                    )
-                    text = f"# {home_team_emoji} {home_team.name} - {away_team.name} {away_team_emoji}"
+                    text = f"# {db_game.message_title}"
                     text += f"\nReminder: Kickoff is <t:{int(db_game.kickoff.timestamp())}:R>. Last chance to get your votes in!"
                     if len(role_members) > 0:
                         text += f"\n-# Looking at you "
@@ -334,7 +326,7 @@ class MyClient(discord.Client):
                 elif answer == models.Outcome.TIE and db_game.gametype_id == "REG":
                     poll.add_answer(text="Tie", emoji="🤝")
             try:
-                content = f"# {home_team.emoji_str} {home_team.name} - {away_team.name} {away_team.emoji_str}"
+                content = f"# {db_game.message_title}"
                 content += f"\n### 🏈   {db_game.gametype.name}"
                 db_scaling = session.get(
                     models.GameTypeScaling, (db_channel.id, db_game.gametype_id)
@@ -845,6 +837,23 @@ class MyClient(discord.Client):
                     session.add(game_type_scaling)
             session.commit()
 
+    async def fix_poll_message_header(self):
+        with Session(self.db) as session:
+            stmt = select(models.Channel).where(models.Channel.active == True)
+            for db_channel in session.scalars(stmt).all():
+                channel = await self.get_or_fetch_channel(db_channel.id)
+                for db_poll in db_channel.polls:
+                    if db_poll.message_id is None:
+                        continue
+                    message = await channel.fetch_message(db_poll.message_id)
+                    message_lines = message.content.split("\n")
+                    if len(message_lines) == 0:
+                        continue
+                    if db_poll.game.message_title in message_lines[0]:
+                        continue
+                    message_lines[0] = f"# {db_poll.game.message_title}"
+                    await message.edit(content="\n".join(message_lines))
+
     async def on_ready(self):
         print(f"Logged on as {self.user}!")
         await self.init_db()
@@ -857,6 +866,7 @@ class MyClient(discord.Client):
                 print(f"{guild.name}: {channel} ({channel.id})")
         # await self.update_all_bets()
         print("LOL1")
+        await self.fix_poll_message_header()
         await self.post_leaderboards()
         # await self.upgrade_result_to_status()
 
