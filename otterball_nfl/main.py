@@ -226,12 +226,12 @@ class MyClient(discord.Client):
                         embed.set_thumbnail(url=leading_team.logo)
                     embed.add_field(
                         name=f"{home_team.emoji_str} {home_team.name}",
-                        value=f"{db_game.home_score or '?'}",
+                        value=f"{db_game.home_score if db_game.home_score is not None else '?'}",
                         inline=True,
                     )
                     embed.add_field(
                         name=f"{away_team.emoji_str} {away_team.name}",
-                        value=f"{db_game.away_score or '?'}",
+                        value=f"{db_game.away_score if db_game.away_score is not None else '?'}",
                         inline=True,
                     )
                     if db_state_message:
