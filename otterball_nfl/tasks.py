@@ -239,8 +239,8 @@ def update_espn_games(*args, **kwargs):
                         .where(models.Game.away_team_id == db_away_team.id)
                         .where(
                             models.Game.kickoff.between(
-                                kickoff - datetime.timedelta(hours=12),
-                                kickoff + datetime.timedelta(hours=12),
+                                kickoff - datetime.timedelta(hours=24),
+                                kickoff + datetime.timedelta(hours=24),
                             )
                         )
                     )
@@ -253,15 +253,15 @@ def update_espn_games(*args, **kwargs):
                             .where(models.Game.away_team_id == db_home_team.id)
                             .where(
                                 models.Game.kickoff.between(
-                                    kickoff - datetime.timedelta(hours=12),
-                                    kickoff + datetime.timedelta(hours=12),
+                                    kickoff - datetime.timedelta(hours=24),
+                                    kickoff + datetime.timedelta(hours=24),
                                 )
                             )
                         )
                         db_game = session.scalars(stmt).first()
                     if db_game is None:
                         logger.error(
-                            f"Game not found for {home_team['team']['displayName']} ({db_home_team}) vs {away_team['team']['displayName']} ({db_away_team}) at {kickoff}"
+                            f"Game not found for {home_team['team']['displayName']} ({db_home_team.id}) vs {away_team['team']['displayName']} ({db_away_team.id}) at {kickoff}"
                         )
                         continue
                     session.add(
