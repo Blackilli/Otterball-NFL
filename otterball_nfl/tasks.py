@@ -35,12 +35,10 @@ def update_games(self: Task, season: int):
             try:
                 db_game = session.get(Game, game.game_id)
                 if db_game:
-                    db_game.home_score = (
-                        int(game.home_score) if not isnan(game.home_score) else None
-                    )
-                    db_game.away_score = (
-                        int(game.away_score) if not isnan(game.away_score) else None
-                    )
+                    if not isnan(game.home_score):
+                        db_game.home_score = int(game.home_score)
+                    if not isnan(game.away_score):
+                        db_game.away_score = int(game.away_score)
                     db_game.kickoff = game.kickoff_utc
                     db_game.result = (
                         int(game.result) if not isnan(game.result) else None
