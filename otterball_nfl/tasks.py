@@ -158,3 +158,106 @@ def update_espn_teams(*args, **kwargs):
                     )
                 )
             session.commit()
+
+
+@signals.worker_ready.connect
+def update_espn_games(*args, **kwargs):
+    missing_years: set[int] = set()
+    with Session(engine) as session:
+        stmt = (
+            select(models.Game)
+            .where(
+                ~models.Game.identifiers.any(
+                    models.GameIdentifier.source == models.ApiSource.ESPN_V2
+                )
+            )
+            .order_by(models.Game.kickoff)
+        )
+        for db_game in session.scalars(stmt).all():
+            missing_years.add(db_game.kickoff.year)
+    if len(missing_years) == 0:
+        return
+    with httpx.Client() as client:
+        for year in missing_years:
+            response = client.get(
+                f"https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=1000&dates={year}"
+            )
+            for event in response.json()["events"]:
+                if event["name"].lower().startswith("tbd"):
+                    continue
+                stmt = (
+                    select(models.GameIdentifier)
+                    .where(models.GameIdentifier.source == models.ApiSource.ESPN_V2)
+                    .where(models.GameIdentifier.external_id == str(event["id"]))
+                )
+                if session.scalars(stmt).first():
+                    continue
+                competition = event["competitions"][0]
+                kickoff = datetime.datetime.fromisoformat(competition["startDate"])
+                home_team = competition["competitors"][0]
+                away_team = competition["competitors"][1]
+                if home_team["homeAway"] == "away":
+                    home_team, away_team = away_team, home_team
+
+                with Session(engine) as session:
+                    stmt = (
+                        select(models.Team)
+                        .join(models.TeamIdentifier)
+                        .where(models.TeamIdentifier.source == models.ApiSource.ESPN_V2)
+                        .where(
+                            models.TeamIdentifier.external_id
+                            == str(home_team["team"]["id"])
+                        )
+                    )
+                    db_home_team = session.scalars(stmt).first()
+
+                    stmt = (
+                        select(models.Team)
+                        .join(models.TeamIdentifier)
+                        .where(models.TeamIdentifier.source == models.ApiSource.ESPN_V2)
+                        .where(
+                            models.TeamIdentifier.external_id
+                            == str(away_team["team"]["id"])
+                        )
+                    )
+                    db_away_team = session.scalars(stmt).first()
+
+                    if db_home_team is None or db_away_team is None:
+                        if db_home_team is None:
+                            logger.error(
+                                f"Home team {home_team['team']['name']} not found"
+                            )
+                        if db_away_team is None:
+                            logger.error(
+                                f"Away team {away_team['team']['name']} not found"
+                            )
+                        continue
+
+                    stmt = (
+                        select(models.Game)
+                        .where(models.Game.home_team_id == db_home_team.id)
+                        .where(models.Game.away_team_id == db_away_team.id)
+                        .where(models.Game.kickoff == kickoff)
+                    )
+                    db_game = session.scalars(stmt).first()
+                    if db_game is None:
+                        # Maybe teams are switched?
+                        stmt = (
+                            select(models.Game)
+                            .where(models.Game.home_team_id == db_away_team.id)
+                            .where(models.Game.away_team_id == db_home_team.id)
+                            .where(models.Game.kickoff == kickoff)
+                        )
+                        db_game = session.scalars(stmt).first()
+                    if db_game is None:
+                        logger.error(
+                            f"Game not found for {home_team['team']['name']} vs {away_team['team']['name']} at {kickoff}"
+                        )
+                    session.add(
+                        models.GameIdentifier(
+                            game_id=db_game.id,
+                            source=models.ApiSource.ESPN_V2,
+                            external_id=str(event["id"]),
+                        )
+                    )
+                    session.commit()
