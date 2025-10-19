@@ -201,13 +201,10 @@ def update_scores(self: Task):
                         f"Away team mismatch for {db_game.id}. {db_away_team.id} != {db_game.away_team_id}"
                     )
                     continue
-
-                db_game.home_score = (
-                    int(home_team["score"]) if home_team["score"] else None
-                )
-                db_game.away_score = (
-                    int(away_team["score"]) if away_team["score"] else None
-                )
+                if home_team.get("score"):
+                    db_game.home_score = int(home_team["score"])
+                if away_team.get("score"):
+                    db_game.away_score = int(away_team["score"])
             session.commit()
 
 
