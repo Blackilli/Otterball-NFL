@@ -202,8 +202,12 @@ def update_scores(self: Task):
                     )
                     continue
 
-                db_game.home_score = int(home_team["score"])
-                db_game.away_score = int(away_team["score"])
+                db_game.home_score = (
+                    int(home_team["score"]) if home_team["score"] else None
+                )
+                db_game.away_score = (
+                    int(away_team["score"]) if away_team["score"] else None
+                )
             session.commit()
 
 
