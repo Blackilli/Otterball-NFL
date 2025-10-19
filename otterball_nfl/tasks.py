@@ -125,6 +125,88 @@ def create_polls(self: Task):
         session.commit()
 
 
+@app.task(bind=True, ignore_result=True)
+def update_scores(self: Task):
+    with Session(engine) as session:
+        stmt = (
+            select(models.Game)
+            .join(models.GameIdentifier)
+            .where(models.GameIdentifier.source == models.ApiSource.ESPN_V2)
+            .where(models.Game.outcome == models.Outcome.NOT_FINISHED)
+            .where(models.Game.kickoff <= datetime.datetime.now(ZoneInfo("UTC")))
+            .order_by(models.Game.kickoff)
+        )
+        db_games = list(session.scalars(stmt).all())
+        if len(db_games) == 0:
+            return
+        first_kickoff: datetime.datetime = db_games[0].kickoff
+        last_kickoff: datetime.datetime = db_games[-1].kickoff
+
+        with httpx.Client() as client:
+            datefmt = "%Y%m%d"
+            response = client.get(
+                f"https://site.web.api.espn.com/apis/fantasy/v2/games/ffl/games?dates={first_kickoff.strftime(datefmt)}-{last_kickoff.strftime(datefmt)}&pbpOnly=true"
+            )
+            for event in response.json()["events"]:
+                stmt = (
+                    select(models.Game)
+                    .join(models.GameIdentifier)
+                    .where(models.GameIdentifier.source == models.ApiSource.ESPN_V2)
+                    .where(models.GameIdentifier.external_id == event["competitionId"])
+                )
+                db_game: models.Game | None = session.scalars(stmt).first()
+                if db_game is None:
+                    continue
+                home_team = event["competitors"][0]
+                away_team = event["competitors"][1]
+                if home_team["homeAway"] == "away":
+                    home_team, away_team = away_team, home_team
+                stmt = (
+                    select(models.Team)
+                    .join(models.TeamIdentifier)
+                    .where(models.TeamIdentifier.source == models.ApiSource.ESPN_V2)
+                    .where(models.TeamIdentifier.external_id == str(home_team["id"]))
+                )
+                db_home_team = session.scalars(stmt).first()
+
+                stmt = (
+                    select(models.Team)
+                    .join(models.TeamIdentifier)
+                    .where(models.TeamIdentifier.source == models.ApiSource.ESPN_V2)
+                    .where(models.TeamIdentifier.external_id == str(away_team["id"]))
+                )
+                db_away_team = session.scalars(stmt).first()
+
+                if db_home_team is None or db_away_team is None:
+                    if db_home_team is None:
+                        logger.error(
+                            f"Home team {home_team['team'].get('name', home_team)} not found"
+                        )
+                    if db_away_team is None:
+                        logger.error(
+                            f"Away team {away_team['team'].get('name', away_team)} not found"
+                        )
+                    continue
+
+                if db_game.home_team_id == db_away_team.id:
+                    db_away_team, db_home_team = db_home_team, db_away_team
+
+                if db_home_team.id != db_game.home_team_id:
+                    logger.error(
+                        f"Home team mismatch for {db_game.id}. {db_home_team.id} != {db_game.home_team_id}"
+                    )
+                    continue
+                if db_away_team.id != db_game.away_team_id:
+                    logger.error(
+                        f"Away team mismatch for {db_game.id}. {db_away_team.id} != {db_game.away_team_id}"
+                    )
+                    continue
+
+                db_game.home_score = int(home_team["score"])
+                db_game.away_score = int(away_team["score"])
+            session.commit()
+
+
 @signals.worker_ready.connect
 def update_espn_teams(*args, **kwargs):
     with httpx.Client() as client:

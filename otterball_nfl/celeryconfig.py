@@ -17,6 +17,10 @@ beat_schedule = {
         "schedule": crontab(minute="*/5"),
         "args": (2025,),
     },
+    "update-game_scores-every-two-minutes": {
+        "task": "otterball_nfl.tasks.update_scores",
+        "schedule": crontab(minute="*/2"),
+    },
     "create-new-polls-every-wednesday": {
         "task": "otterball_nfl.tasks.create_polls",
         "schedule": crontab(day_of_week="wednesday", hour="18", minute="0"),
