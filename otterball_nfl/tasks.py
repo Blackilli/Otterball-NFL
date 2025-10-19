@@ -261,7 +261,7 @@ def update_espn_games(*args, **kwargs):
                         db_game = session.scalars(stmt).first()
                     if db_game is None:
                         logger.error(
-                            f"Game not found for {home_team['team']['name']} vs {away_team['team']['name']} at {kickoff}"
+                            f"Game not found for {home_team['team']['displayName']} ({db_home_team}) vs {away_team['team']['displayName']} ({db_away_team}) at {kickoff}"
                         )
                         continue
                     session.add(
