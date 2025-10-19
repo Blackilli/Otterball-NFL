@@ -225,11 +225,11 @@ def update_espn_games(*args, **kwargs):
                     if db_home_team is None or db_away_team is None:
                         if db_home_team is None:
                             logger.error(
-                                f"Home team {home_team['team']['name']} not found"
+                                f"Home team {home_team['team'].get('name', home_team)} not found"
                             )
                         if db_away_team is None:
                             logger.error(
-                                f"Away team {away_team['team']['name']} not found"
+                                f"Away team {away_team['team'].get('name', away_team)} not found"
                             )
                         continue
 
