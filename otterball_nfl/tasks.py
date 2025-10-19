@@ -253,6 +253,7 @@ def update_espn_games(*args, **kwargs):
                         logger.error(
                             f"Game not found for {home_team['team']['name']} vs {away_team['team']['name']} at {kickoff}"
                         )
+                        continue
                     session.add(
                         models.GameIdentifier(
                             game_id=db_game.id,
