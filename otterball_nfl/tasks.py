@@ -148,6 +148,8 @@ def update_scores(self: Task):
                 f"https://site.web.api.espn.com/apis/fantasy/v2/games/ffl/games?dates={first_kickoff.strftime(datefmt)}-{last_kickoff.strftime(datefmt)}&pbpOnly=true"
             )
             for event in response.json()["events"]:
+                if event["status"].lower() in ["pre", "post"]:
+                    continue
                 stmt = (
                     select(models.Game)
                     .join(models.GameIdentifier)
@@ -201,10 +203,13 @@ def update_scores(self: Task):
                         f"Away team mismatch for {db_game.id}. {db_away_team.id} != {db_game.away_team_id}"
                     )
                     continue
-                if home_team.get("score"):
-                    db_game.home_score = int(home_team["score"])
-                if away_team.get("score"):
-                    db_game.away_score = int(away_team["score"])
+
+                db_game.home_score = (
+                    int(home_team["score"]) if home_team["score"] else 0
+                )
+                db_game.away_score = (
+                    int(away_team["score"]) if away_team["score"] else 0
+                )
             session.commit()
 
 
