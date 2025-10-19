@@ -182,24 +182,24 @@ def update_espn_games(*args, **kwargs):
             response = client.get(
                 f"https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=1000&dates={year}"
             )
-            for event in response.json()["events"]:
-                if event["name"].lower().startswith("tbd"):
-                    continue
-                stmt = (
-                    select(models.GameIdentifier)
-                    .where(models.GameIdentifier.source == models.ApiSource.ESPN_V2)
-                    .where(models.GameIdentifier.external_id == str(event["id"]))
-                )
-                if session.scalars(stmt).first():
-                    continue
-                competition = event["competitions"][0]
-                kickoff = datetime.datetime.fromisoformat(competition["startDate"])
-                home_team = competition["competitors"][0]
-                away_team = competition["competitors"][1]
-                if home_team["homeAway"] == "away":
-                    home_team, away_team = away_team, home_team
+            with Session(engine) as session:
+                for event in response.json()["events"]:
+                    if event["name"].lower().startswith("tbd"):
+                        continue
+                    stmt = (
+                        select(models.GameIdentifier)
+                        .where(models.GameIdentifier.source == models.ApiSource.ESPN_V2)
+                        .where(models.GameIdentifier.external_id == str(event["id"]))
+                    )
+                    if session.scalars(stmt).first():
+                        continue
+                    competition = event["competitions"][0]
+                    kickoff = datetime.datetime.fromisoformat(competition["startDate"])
+                    home_team = competition["competitors"][0]
+                    away_team = competition["competitors"][1]
+                    if home_team["homeAway"] == "away":
+                        home_team, away_team = away_team, home_team
 
-                with Session(engine) as session:
                     stmt = (
                         select(models.Team)
                         .join(models.TeamIdentifier)
@@ -261,4 +261,4 @@ def update_espn_games(*args, **kwargs):
                             external_id=str(event["id"]),
                         )
                     )
-                    session.commit()
+                session.commit()
