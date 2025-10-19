@@ -237,7 +237,12 @@ def update_espn_games(*args, **kwargs):
                         select(models.Game)
                         .where(models.Game.home_team_id == db_home_team.id)
                         .where(models.Game.away_team_id == db_away_team.id)
-                        .where(models.Game.kickoff == kickoff)
+                        .where(
+                            models.Game.kickoff.between(
+                                kickoff - datetime.timedelta(hours=12),
+                                kickoff + datetime.timedelta(hours=12),
+                            )
+                        )
                     )
                     db_game = session.scalars(stmt).first()
                     if db_game is None:
@@ -246,7 +251,12 @@ def update_espn_games(*args, **kwargs):
                             select(models.Game)
                             .where(models.Game.home_team_id == db_away_team.id)
                             .where(models.Game.away_team_id == db_home_team.id)
-                            .where(models.Game.kickoff == kickoff)
+                            .where(
+                                models.Game.kickoff.between(
+                                    kickoff - datetime.timedelta(hours=12),
+                                    kickoff + datetime.timedelta(hours=12),
+                                )
+                            )
                         )
                         db_game = session.scalars(stmt).first()
                     if db_game is None:
