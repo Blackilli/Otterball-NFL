@@ -137,8 +137,12 @@ def update_scores(self: Task):
         db_games = list(session.scalars(stmt).all())
         if len(db_games) == 0:
             return
-        first_kickoff: datetime.datetime = db_games[0].kickoff
-        last_kickoff: datetime.datetime = db_games[-1].kickoff
+        first_kickoff: datetime.datetime = db_games[0].kickoff - datetime.timedelta(
+            days=1
+        )
+        last_kickoff: datetime.datetime = db_games[-1].kickoff + datetime.timedelta(
+            days=1
+        )
 
         with httpx.Client() as client:
             datefmt = "%Y%m%d"
